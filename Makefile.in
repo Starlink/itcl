@@ -12,7 +12,7 @@
 # See the file "license.terms" for information on usage and redistribution
 # of this file, and for a DISCLAIMER OF ALL WARRANTIES.
 #
-# RCS: @(#) $Id: Makefile.in,v 1.27 2005/03/25 22:58:48 dgp Exp $
+# RCS: @(#) $Id: Makefile.in,v 1.29 2007/07/03 23:45:44 hobbs Exp $
 
 #========================================================================
 # The names of the source files is defined in the configure script.
@@ -132,13 +132,13 @@ ITCLSH_LIBS     = @TCL_LIB_SPEC@ @LIBS@ @DL_LIBS@ @MATH_LIBS@
 #========================================================================
 
 EXTRA_PATH	= $(top_builddir):$(TCL_BIN_DIR)
-TCLSH_ENV	= TCL_LIBRARY=`@CYGPATH@ $(TCL_SRC_DIR)/library` \
-		  ITCL_LIBRARY=`@CYGPATH@ $(srcdir)/library` \
+TCLSH_ENV	= TCL_LIBRARY=`@CYGPATH@ $(TCL_SRC_DIR)/library`
+PKG_ENV		= ITCL_LIBRARY=`@CYGPATH@ $(srcdir)/library` \
 		  @LD_LIBRARY_PATH_VAR@="$(EXTRA_PATH):$(@LD_LIBRARY_PATH_VAR@)" \
 		  PATH="$(EXTRA_PATH):$(PATH)" \
 		  TCLLIBPATH="$(top_builddir)"
-TCLSH_PROG	= @TCLSH_PROG@
-TCLSH		= $(TCLSH_ENV) $(TCLSH_PROG)
+TCLSH_PROG	= $(TCLSH_ENV) @TCLSH_PROG@
+TCLSH		= $(PKG_ENV) $(TCLSH_PROG)
 SHARED_BUILD	= @SHARED_BUILD@
 
 INCLUDES	= @PKG_INCLUDES@ @TCL_INCLUDES@
@@ -277,8 +277,9 @@ VPATH = $(srcdir)/unix:$(srcdir)/generic:$(srcdir)/win
 # You may need to tweak this target to make it work correctly.
 #========================================================================
 
+TAR		= tar
 #COMPRESS       = tar cvf $(PKG_DIR).tar $(PKG_DIR); compress $(PKG_DIR).tar
-COMPRESS        = gtar zcvf $(PKG_DIR).tar.gz $(PKG_DIR)
+COMPRESS        = $(TAR) zcvf $(PKG_DIR).tar.gz $(PKG_DIR)
 DIST_ROOT       = /tmp/dist
 DIST_DIR        = $(DIST_ROOT)/$(PKG_DIR)
 
@@ -298,7 +299,7 @@ dist: dist-clean doc
 	chmod 664 $(DIST_DIR)/tclconfig/tcl.m4
 	chmod +x $(DIST_DIR)/tclconfig/install-sh
 
-	list='doc generic library tests tests/old win win/rc'; \
+	list='doc generic library tests win win/rc'; \
 	for p in $$list; do \
 	    if test -d $(srcdir)/$$p ; then \
 		mkdir $(DIST_DIR)/$$p; \
