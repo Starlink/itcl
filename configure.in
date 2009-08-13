@@ -10,7 +10,7 @@
 # so you can encode the package version directly into the source files.
 #-----------------------------------------------------------------------
 
-AC_INIT([itcl], [3.4])
+AC_INIT([itcl], [4.0b3])
 
 #--------------------------------------------------------------------
 # Call TEA_INIT as the first TEA_ macro to set up initial vars.
@@ -18,14 +18,14 @@ AC_INIT([itcl], [3.4])
 # as well as PKG_LIB_FILE and PKG_STUB_LIB_FILE.
 #--------------------------------------------------------------------
 
-TEA_INIT([3.6])
+TEA_INIT([3.7])
 
 AC_PROG_LN_S
 CONFIG_CLEAN_FILES=
 if test ! -d $srcdir/tclconfig ; then
     if test -d $srcdir/../tclconfig ; then
-	$LN_S $srcdir/../tclconfig tclconfig
-	CONFIG_CLEAN_FILES=tclconfig
+        $LN_S $srcdir/../tclconfig tclconfig
+        CONFIG_CLEAN_FILES=tclconfig
     fi
 fi
 AC_SUBST(CONFIG_CLEAN_FILES)
@@ -65,26 +65,36 @@ TEA_SETUP_COMPILER
 # and PKG_TCL_SOURCES.
 #-----------------------------------------------------------------------
 
-TEA_ADD_SOURCES([itclStubInit.c
-		itcl_bicmds.c
-		itcl_class.c
-		itcl_cmds.c
-		itcl_ensemble.c
-		itcl_linkage.c
-		itcl_methods.c
-		itcl_migrate.c
-		itcl_objects.c
-		itcl_parse.c
-		itcl_util.c])
+
+TEA_ADD_SOURCES([
+                itcl2TclOO.c
+	        itclBase.c
+	        itclBuiltin.c
+                itclClass.c
+                itclCmd.c
+                itclEnsemble.c
+                itclHelpers.c
+	        itclInfo.c
+                itclLinkage.c
+                itclMethod.c
+                itclObject.c
+	        itclParse.c
+	        itclStubs.c
+                itclStubInit.c
+	        itclResolve.c
+	        itclTclIntStubsFcn.c
+	        itclUtil.c
+                itclMigrate2TclCore.c
+                itclNeededFromTclOO.c
+                ])
 TEA_ADD_HEADERS([generic/itcl.h
-		generic/itclDecls.h
-		generic/itclInt.h
-		generic/itclIntDecls.h])
-TEA_ADD_INCLUDES([-I\"`${CYGPATH} ${srcdir}/generic`\"])
+                generic/itclDecls.h
+		generic/itclInt.h])
+TEA_ADD_INCLUDES([-I. -I\"`${CYGPATH} ${srcdir}/generic`\"])
 TEA_ADD_LIBS([])
-TEA_ADD_CFLAGS([])
-TEA_ADD_STUB_SOURCES([itclStubLib.c])
-TEA_ADD_TCL_SOURCES([library/itcl.tcl])
+TEA_ADD_CFLAGS([-DUSE_TCLOO_STUBS])
+TEA_ADD_STUB_SOURCES(itclStubLib.c)
+TEA_ADD_TCL_SOURCES([library/itcl.tcl library/itclWidget.tcl library/itclHullCmds.tcl])
 
 #--------------------------------------------------------------------
 # __CHANGE__
@@ -160,7 +170,7 @@ TEA_ENABLE_SHARED
 TEA_CONFIG_CFLAGS
 
 #--------------------------------------------------------------------
-# Set the default compiler switches based on the --enable-symbols 
+# Set the default compiler switches based on the --enable-symbols
 # option.
 #--------------------------------------------------------------------
 
@@ -239,6 +249,12 @@ AC_SUBST(itcl_STUB_LIB_PATH)
 eval itcl_SRC_DIR="$srcdir"
 itcl_SRC_DIR=`cd "${itcl_SRC_DIR}"; pwd`
 AC_SUBST(itcl_SRC_DIR)
+
+eval itcl_INCLUDE_DIR="${itcl_SRC_DIR}/generic"
+AC_SUBST(itcl_INCLUDE_DIR)
+
+eval itcl_INCLUDE_SPEC="${itcl_SRC_DIR}/generic"
+AC_SUBST(itcl_INCLUDE_SPEC)
 
 #--------------------------------------------------------------------
 # Finally, substitute all of the various values into the Makefile.
