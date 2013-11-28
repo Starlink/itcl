@@ -24,8 +24,6 @@
  *           http://www.tcltk.com/itcl
  *
  *  overhauled version author: Arnulf Wiedemann Copyright (c) 2007
- *
- *     RCS:  $Id: itclClass.c,v 1.1.2.51 2009/01/24 19:32:55 wiede Exp $
  * ========================================================================
  *           Copyright (c) 1993-1998  Lucent Technologies, Inc.
  * ------------------------------------------------------------------------
@@ -34,7 +32,6 @@
  */
 #include "itclInt.h"
 
-extern Tcl_ObjCmdProc Itcl_ThisCmd;
 static Tcl_NamespaceDeleteProc* _TclOONamespaceDeleteProc = NULL;
 static void ItclDeleteOption(char *cdata);
 
@@ -146,12 +143,8 @@ void
 ItclDeleteClassMetadata(
     ClientData clientData)
 {
-    ItclClass *iclsPtr;
-
     /* do we need that at all ? */
-return;
-
-    iclsPtr = clientData;
+    return;
 }
 
 static int
@@ -189,12 +182,12 @@ CallNewObjectInstance(
 int
 Itcl_CreateClass(
     Tcl_Interp* interp,		/* interpreter that will contain new class */
-    CONST char* path,		/* name of new class */
+    const char* path,		/* name of new class */
     ItclObjectInfo *infoPtr,	/* info for all known objects */
     ItclClass **rPtr)		/* returns: pointer to class definition */
 {
-    char *head;
-    char *tail;
+    const char *head;
+    const char *tail;
     Tcl_DString buffer;
     Tcl_Command cmd;
     Tcl_CmdInfo cmdInfo;
@@ -352,7 +345,7 @@ Itcl_CreateClass(
      *    <className>
      *    <className> <objName> ?<constructor-args>?
      */
-    Itcl_NRAddCallback(interp, CallNewObjectInstance, infoPtr,
+    Tcl_NRAddCallback(interp, CallNewObjectInstance, infoPtr,
             (ClientData)path, &oPtr, nameObjPtr);
     result = Itcl_NRRunCallbacks(interp, callbackPtr);
     if (result == TCL_ERROR) {
@@ -450,9 +443,9 @@ Itcl_CreateClass(
     Tcl_DStringAppend(&buffer, Tcl_GetString(iclsPtr->fullNamePtr), -1);
     if (Tcl_CreateNamespace(interp, Tcl_DStringValue(&buffer),
             NULL, 0) == NULL) {
-	Tcl_AppendResult(interp, "ITCL: cannot create variables namespace \"",
-	Tcl_DStringValue(&buffer), "\"", NULL);
-	result = TCL_ERROR;
+        Tcl_AppendResult(interp, "ITCL: cannot create variables namespace \"",
+        Tcl_DStringValue(&buffer), "\"", NULL);
+        result = TCL_ERROR;
         goto errorOut;
     }
 
@@ -606,29 +599,11 @@ ItclDeleteClassVariablesNamespace(
     Tcl_Interp *interp,
     ItclClass *iclsPtr)
 {
-    Tcl_DString buffer;
-    Tcl_Namespace *varNsPtr;
-
     /* TODO: why is this being skipped? */
-return;
-
-    if (iclsPtr->nsPtr == NULL) {
-        return;
-    }
-    /* free the classes's variables namespace and variables in it */
-    Tcl_DStringInit(&buffer);
-    Tcl_DStringAppend(&buffer, ITCL_VARIABLES_NAMESPACE, -1);
-    Tcl_DStringAppend(&buffer, iclsPtr->nsPtr->fullName, -1);
-    varNsPtr = Tcl_FindNamespace(interp, Tcl_DStringValue(&buffer),
-	    NULL, 0);
-    if (varNsPtr != NULL) {
-        Tcl_DeleteNamespace(varNsPtr);
-    }
-    Tcl_DStringFree(&buffer);
-    iclsPtr->nsPtr = NULL;
+    return;
 }
 
-int
+static int
 CallDeleteOneObject(
     ClientData data[],
     Tcl_Interp *interp,
@@ -679,7 +654,7 @@ CallDeleteOneObject(
                 goto deleteClassFail;
             }
 
-            Itcl_NRAddCallback(interp, CallDeleteOneObject, iclsPtr,
+            Tcl_NRAddCallback(interp, CallDeleteOneObject, iclsPtr,
 	            infoPtr, NULL, NULL);
             return Itcl_NRRunCallbacks(interp, callbackPtr);
         }
@@ -702,7 +677,7 @@ deleteClassFail:
     return TCL_ERROR;
 }
 
-int
+static int
 CallDeleteOneClass(
     ClientData data[],
     Tcl_Interp *interp,
@@ -789,7 +764,7 @@ Itcl_DeleteClass(
         elem = Itcl_NextListElem(elem);  /* advance here--elem will go away */
 
         callbackPtr = Itcl_GetCurrentCallbackPtr(interp);
-        Itcl_NRAddCallback(interp, CallDeleteOneClass, iclsPtr2,
+        Tcl_NRAddCallback(interp, CallDeleteOneClass, iclsPtr2,
 	        iclsPtr2->infoPtr, NULL, NULL);
         result = Itcl_NRRunCallbacks(interp, callbackPtr);
         if (result != TCL_OK) {
@@ -812,7 +787,7 @@ Itcl_DeleteClass(
      * otherwise we return at the end of the enrolled loop.
      */
     callbackPtr = Itcl_GetCurrentCallbackPtr(interp);
-    Itcl_NRAddCallback(interp, CallDeleteOneObject, iclsPtr,
+    Tcl_NRAddCallback(interp, CallDeleteOneObject, iclsPtr,
             iclsPtr->infoPtr, NULL, NULL);
     result = Itcl_NRRunCallbacks(interp, callbackPtr);
     if (result != TCL_OK) {
@@ -1136,7 +1111,9 @@ ItclFreeClass(
         }
         icPtr = Tcl_GetHashValue(hPtr);
 	Tcl_DeleteHashEntry(hPtr);
-        ItclDeleteComponent(icPtr);
+	if (icPtr != NULL) {
+            ItclDeleteComponent(icPtr);
+	}
     }
     Tcl_DeleteHashTable(&iclsPtr->components);
 
@@ -1150,7 +1127,9 @@ ItclFreeClass(
         }
         ivPtr = Tcl_GetHashValue(hPtr);
 	Tcl_DeleteHashEntry(hPtr);
-        Itcl_ReleaseData(ivPtr);
+	if (ivPtr != NULL) {
+            Itcl_ReleaseData(ivPtr);
+	}
     }
     Tcl_DeleteHashTable(&iclsPtr->variables);
 
@@ -1312,9 +1291,10 @@ Itcl_IsClass(
  * ------------------------------------------------------------------------
  */
 ItclClass*
-Itcl_FindClass(interp, path, autoload)
-    Tcl_Interp* interp;      /* interpreter containing class */
-    CONST char* path;              /* path name for class */
+Itcl_FindClass(
+    Tcl_Interp* interp,      /* interpreter containing class */
+    const char* path,        /* path name for class */
+    int autoload)
 {
     Tcl_Namespace* classNs;
 
@@ -1396,7 +1376,7 @@ Itcl_FindClass(interp, path, autoload)
 Tcl_Namespace*
 Itcl_FindClassNamespace(interp, path)
     Tcl_Interp* interp;        /* interpreter containing class */
-    CONST char* path;                /* path name for class */
+    const char* path;                /* path name for class */
 {
     Tcl_Namespace* contextNs = Tcl_GetCurrentNamespace(interp);
     Tcl_Namespace* classNs;
@@ -1449,8 +1429,8 @@ FinalizeCreateObject(
     if (result == TCL_ERROR) {
 	Tcl_Obj *objPtr;
 	
+	(void) Tcl_GetReturnOptions(interp, result);
 	objPtr = Tcl_NewStringObj("-level 2", -1);
-	/* result = Tcl_SetReturnOptions(interp, objPtr); */
 	if (!(iclsPtr->flags & (ITCL_TYPE|ITCL_WIDGETADAPTOR))) {
 	    result = Tcl_SetReturnOptions(interp, objPtr);
 	} else {
@@ -1458,6 +1438,24 @@ FinalizeCreateObject(
 	}
     }
     Tcl_DecrRefCount(objNamePtr);
+    return result;
+}
+
+static int
+CallCreateObject(
+    ClientData data[],
+    Tcl_Interp *interp,
+    int result)
+{
+    Tcl_Obj *objNamePtr = data[0];
+    ItclClass *iclsPtr = data[1];
+    int objc = PTR2INT(data[2]);
+    Tcl_Obj **objv = data[3];
+
+    if (result == TCL_OK) {
+        result = ItclCreateObject(interp, Tcl_GetString(objNamePtr), iclsPtr,
+                objc, objv);
+    }
     return result;
 }
 /*
@@ -1492,15 +1490,17 @@ Itcl_HandleClass(
     Tcl_DString buffer;  /* buffer used to build object names */
     Tcl_Obj *objNamePtr;
     Tcl_HashEntry *hPtr;
+    Tcl_Obj **newObjv;
     ItclClass *iclsPtr;
     ItclObjectInfo *infoPtr;
+    void *callbackPtr;
     char unique[256];    /* buffer used for unique part of object names */
     char *token;
     char *objName;
     char tmp;
     char *start;
     char *pos;
-    char *match;
+    const char *match;
     int result;
 
     infoPtr = (ItclObjectInfo *)clientData;
@@ -1574,7 +1574,7 @@ Itcl_HandleClass(
 
                     sprintf(unique,"%.200s%d", Tcl_GetString(iclsPtr->namePtr),
                         iclsPtr->unique++);
-                    unique[0] = tolower(unique[0]);
+                    unique[0] = tolower(UCHAR(unique[0]));
 
                     Tcl_DStringTrunc(&buffer, 0);
                     Tcl_DStringAppend(&buffer, token, -1);
@@ -1618,10 +1618,13 @@ Itcl_HandleClass(
     objNamePtr = Tcl_NewStringObj(objName, -1);
     Tcl_IncrRefCount(objNamePtr);
     Tcl_DStringFree(&buffer);
-    Itcl_NRAddCallback(interp, FinalizeCreateObject, objNamePtr, iclsPtr,
+    callbackPtr = Itcl_GetCurrentCallbackPtr(interp);
+    newObjv = (Tcl_Obj **)(objv+4);
+    Tcl_NRAddCallback(interp, FinalizeCreateObject, objNamePtr, iclsPtr,
             NULL, NULL);
-    result = ItclCreateObject(interp, Tcl_GetString(objNamePtr), iclsPtr,
-            objc-4, objv+4);
+    Tcl_NRAddCallback(interp, CallCreateObject, objNamePtr, iclsPtr,
+            INT2PTR(objc-4), newObjv);
+    result = Itcl_NRRunCallbacks(interp, callbackPtr);
     return result;
 }
 
@@ -2218,13 +2221,13 @@ Itcl_CreateMethodVariable(
  *  anything goes wrong, this returns NULL.
  * ------------------------------------------------------------------------
  */
-CONST char*
+const char*
 Itcl_GetCommonVar(
     Tcl_Interp *interp,        /* current interpreter */
-    CONST char *name,          /* name of desired instance variable */
+    const char *name,          /* name of desired instance variable */
     ItclClass *contextIclsPtr) /* name is interpreted in this scope */
 {
-    CONST char *val = NULL;
+    const char *val = NULL;
     Tcl_HashEntry *hPtr;
     Tcl_DString buffer;
     Tcl_Obj *namePtr;

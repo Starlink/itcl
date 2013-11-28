@@ -38,8 +38,6 @@
  *           http://www.tcltk.com/itcl
  *
  *  overhauled version author: Arnulf Wiedemann
- *
- *     RCS:  $Id: itclParse.c,v 1.1.2.68 2009/01/24 19:44:05 wiede Exp $
  * ========================================================================
  *           Copyright (c) 1993-1998  Lucent Technologies, Inc.
  * ------------------------------------------------------------------------
@@ -48,64 +46,64 @@
  */
 #include "itclInt.h"
 
-static char initWidgetScript[] = "\n\
-namespace eval ::itcl {\n\
-    proc _find_widget_init {} {\n\
-        global env tcl_library\n\
-        variable library\n\
-        variable patchLevel\n\
-        rename _find_widget_init {}\n\
-        if {[info exists library]} {\n\
-            lappend dirs $library\n\
-        } else {\n\
-            if {[catch {uplevel #0 source -rsrc itcl}] == 0} {\n\
-                return\n\
-            }\n\
-            set dirs {}\n\
-            if {[info exists env(ITCL_LIBRARY)]} {\n\
-                lappend dirs $env(ITCL_LIBRARY)\n\
-            }\n\
-            lappend dirs [file join [file dirname $tcl_library] itcl$patchLevel]\n\
-            set bindir [file dirname [info nameofexecutable]]\n\
-	    lappend dirs [file join . library]\n\
-            lappend dirs [file join $bindir .. lib itcl$patchLevel]\n\
-            lappend dirs [file join $bindir .. library]\n\
-            lappend dirs [file join $bindir .. .. library]\n\
-            lappend dirs [file join $bindir .. .. itcl library]\n\
-            lappend dirs [file join $bindir .. .. .. itcl library]\n\
-            lappend dirs [file join $bindir .. .. itcl-ng itcl library]\n\
-            # On MacOSX, check the directories in the tcl_pkgPath\n\
-            if {[string equal $::tcl_platform(platform) \"unix\"] && \
-                    [string equal $::tcl_platform(os) \"Darwin\"]} {\n\
-                foreach d $::tcl_pkgPath {\n\
-                    lappend dirs [file join $d itcl$patchLevel]\n\
-                }\n\
-            }\n\
-            # On *nix, check the directories in the tcl_pkgPath\n\
-            if {[string equal $::tcl_platform(platform) \"unix\"]} {\n\
-                foreach d $::tcl_pkgPath {\n\
-                    lappend dirs $d\n\
-                    lappend dirs [file join $d itcl$patchLevel]\n\
-                }\n\
-            }\n\
-        }\n\
-        foreach i $dirs {\n\
-            set library $i\n\
-            set itclfile [file join $i itclWidget.tcl]\n\
-            if {![catch {uplevel #0 [list source $itclfile]} msg]} {\n\
-                return\n\
-            }\n\
-        }\n\
-        set msg \"Can't find a usable itclWidget.tcl in the following directories:\n\"\n\
-        append msg \"    $dirs\n\"\n\
-        append msg \"This probably means that Itcl/Tcl weren't installed properly.\n\"\n\
-        append msg \"If you know where the Itcl library directory was installed,\n\"\n\
-        append msg \"you can set the environment variable ITCL_LIBRARY to point\n\"\n\
-        append msg \"to the library directory.\n\"\n\
-        error $msg\n\
-    }\n\
-    _find_widget_init\n\
-}";
+static const char initWidgetScript[] =
+"namespace eval ::itcl {\n"
+"    proc _find_widget_init {} {\n"
+"        global env tcl_library\n"
+"        variable library\n"
+"        variable patchLevel\n"
+"        rename _find_widget_init {}\n"
+"        if {[info exists library]} {\n"
+"            lappend dirs $library\n"
+"        } else {\n"
+"            if {[catch {uplevel #0 source -rsrc itcl}] == 0} {\n"
+"                return\n"
+"            }\n"
+"            set dirs {}\n"
+"            if {[info exists env(ITCL_LIBRARY)]} {\n"
+"                lappend dirs $env(ITCL_LIBRARY)\n"
+"            }\n"
+"            lappend dirs [file join [file dirname $tcl_library] itcl$patchLevel]\n"
+"            set bindir [file dirname [info nameofexecutable]]\n"
+"            lappend dirs [file join . library]\n"
+"            lappend dirs [file join $bindir .. lib itcl$patchLevel]\n"
+"            lappend dirs [file join $bindir .. library]\n"
+"            lappend dirs [file join $bindir .. .. library]\n"
+"            lappend dirs [file join $bindir .. .. itcl library]\n"
+"            lappend dirs [file join $bindir .. .. .. itcl library]\n"
+"            lappend dirs [file join $bindir .. .. itcl-ng itcl library]\n"
+"            # On MacOSX, check the directories in the tcl_pkgPath\n"
+"            if {[string equal $::tcl_platform(platform) \"unix\"] &&"
+"                    [string equal $::tcl_platform(os) \"Darwin\"]} {\n"
+"                foreach d $::tcl_pkgPath {\n"
+"                    lappend dirs [file join $d itcl$patchLevel]\n"
+"                }\n"
+"            }\n"
+"            # On *nix, check the directories in the tcl_pkgPath\n"
+"            if {[string equal $::tcl_platform(platform) \"unix\"]} {\n"
+"                foreach d $::tcl_pkgPath {\n"
+"                    lappend dirs $d\n"
+"                    lappend dirs [file join $d itcl$patchLevel]\n"
+"                }\n"
+"            }\n"
+"        }\n"
+"        foreach i $dirs {\n"
+"            set library $i\n"
+"            set itclfile [file join $i itclWidget.tcl]\n"
+"            if {![catch {uplevel #0 [list source $itclfile]} msg]} {\n"
+"                return\n"
+"            }\n"
+"        }\n"
+"        set msg \"Can't find a usable itclWidget.tcl in the following directories:\n\"\n"
+"        append msg \"    $dirs\n\"\n"
+"        append msg \"This probably means that Itcl/Tcl weren't installed properly.\n\"\n"
+"        append msg \"If you know where the Itcl library directory was installed,\n\"\n"
+"        append msg \"you can set the environment variable ITCL_LIBRARY to point\n\"\n"
+"        append msg \"to the library directory.\n\"\n"
+"        error $msg\n"
+"    }\n"
+"    _find_widget_init\n"
+"}";
 
 /*
  *  Info needed for public/protected/private commands:
@@ -123,43 +121,21 @@ static void ItclDelObjectInfo(char* cdata);
 static int ItclInitClassCommon(Tcl_Interp *interp, ItclClass *iclsPtr,
         ItclVariable *ivPtr, const char *initStr);
 
-Tcl_ObjCmdProc Itcl_ClassCommonCmd;
-Tcl_ObjCmdProc Itcl_ClassTypeVariableCmd;
-Tcl_ObjCmdProc Itcl_ClassConstructorCmd;
-Tcl_ObjCmdProc Itcl_ClassDestructorCmd;
-Tcl_ObjCmdProc Itcl_HandleClass;
-Tcl_ObjCmdProc Itcl_ClassInheritCmd;
-Tcl_ObjCmdProc Itcl_ClassMethodCmd;
-Tcl_ObjCmdProc Itcl_ClassProcCmd;
-Tcl_ObjCmdProc Itcl_ClassTypeMethodCmd;
-Tcl_ObjCmdProc Itcl_ClassVariableCmd;
-Tcl_ObjCmdProc Itcl_ClassProtectionCmd;
-Tcl_ObjCmdProc Itcl_ClassFilterCmd;
-Tcl_ObjCmdProc Itcl_ClassMixinCmd;
-Tcl_ObjCmdProc Itcl_WidgetCmd;
-Tcl_ObjCmdProc Itcl_WidgetAdaptorCmd;
-Tcl_ObjCmdProc Itcl_ClassOptionCmd;
-Tcl_ObjCmdProc Itcl_NWidgetCmd;
-Tcl_ObjCmdProc Itcl_ExtendedClassCmd;
-Tcl_ObjCmdProc Itcl_TypeClassCmd;
-Tcl_ObjCmdProc Itcl_AddOptionCmd;
-Tcl_ObjCmdProc Itcl_AddObjectOptionCmd;
-Tcl_ObjCmdProc Itcl_AddDelegatedOptionCmd;
-Tcl_ObjCmdProc Itcl_AddDelegatedFunctionCmd;
-Tcl_ObjCmdProc Itcl_AddComponentCmd;
-Tcl_ObjCmdProc Itcl_SetComponentCmd;
-Tcl_ObjCmdProc Itcl_ClassComponentCmd;
-Tcl_ObjCmdProc Itcl_ClassTypeComponentCmd;
-Tcl_ObjCmdProc Itcl_ClassDelegateMethodCmd;
-Tcl_ObjCmdProc Itcl_ClassDelegateOptionCmd;
-Tcl_ObjCmdProc Itcl_ClassDelegateTypeMethodCmd;
-Tcl_ObjCmdProc Itcl_ClassForwardCmd;
-Tcl_ObjCmdProc Itcl_ClassMethodVariableCmd;
-Tcl_ObjCmdProc Itcl_ClassTypeConstructorCmd;
-Tcl_ObjCmdProc Itcl_ClassHullTypeCmd;
-Tcl_ObjCmdProc Itcl_ClassWidgetClassCmd;
-Tcl_ObjCmdProc Itcl_EnsembleDeleteCmd;
-Tcl_ObjCmdProc ItclGenericClassCmd;
+static Tcl_ObjCmdProc Itcl_ClassTypeVariableCmd;
+static Tcl_ObjCmdProc Itcl_ClassTypeMethodCmd;
+static Tcl_ObjCmdProc Itcl_ClassFilterCmd;
+static Tcl_ObjCmdProc Itcl_ClassMixinCmd;
+static Tcl_ObjCmdProc Itcl_WidgetCmd;
+static Tcl_ObjCmdProc Itcl_WidgetAdaptorCmd;
+static Tcl_ObjCmdProc Itcl_ClassComponentCmd;
+static Tcl_ObjCmdProc Itcl_ClassTypeComponentCmd;
+static Tcl_ObjCmdProc Itcl_ClassDelegateMethodCmd;
+static Tcl_ObjCmdProc Itcl_ClassDelegateOptionCmd;
+static Tcl_ObjCmdProc Itcl_ClassDelegateTypeMethodCmd;
+static Tcl_ObjCmdProc Itcl_ClassForwardCmd;
+static Tcl_ObjCmdProc Itcl_ClassMethodVariableCmd;
+static Tcl_ObjCmdProc Itcl_ClassTypeConstructorCmd;
+static Tcl_ObjCmdProc ItclGenericClassCmd;
 
 static const struct {
     const char *name;
@@ -615,7 +591,7 @@ Itcl_ParseInit(
  *
  * ------------------------------------------------------------------------
  */
-int
+static int
 ItclGenericClassCmd(
     ClientData clientData,   /* info for all known objects */
     Tcl_Interp *interp,      /* current interpreter */
@@ -645,12 +621,12 @@ ItclGenericClassCmd(
                 "\"", NULL);
         return TCL_ERROR;
     }
-    result = ItclClassBaseCmd(clientData, interp, (int)Tcl_GetHashValue(hPtr),
+    result = ItclClassBaseCmd(clientData, interp, PTR2INT(Tcl_GetHashValue(hPtr)),
             objc - 1, objv + 1, &iclsPtr);
     if (result != TCL_OK) {
         return result;
     }
-    if ((int)Tcl_GetHashValue(hPtr) == ITCL_WIDGETADAPTOR) {
+    if (PTR2INT(Tcl_GetHashValue(hPtr)) == ITCL_WIDGETADAPTOR) {
         /* create the itcl_hull variable */
         namePtr = Tcl_NewStringObj("itcl_hull", -1);
         if (ItclCreateComponent(interp, iclsPtr, namePtr, ITCL_COMMON,
@@ -695,7 +671,7 @@ Itcl_ClassCmd(
     ClientData clientData,   /* info for all known objects */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
-    Tcl_Obj *CONST objv[])   /* argument objects */
+    Tcl_Obj *const objv[])   /* argument objects */
 {
     ItclClass *iclsPtr;
 
@@ -716,7 +692,7 @@ ItclClassBaseCmd(
     int flags,               /* flags: ITCL_CLASS, ITCL_TYPE,
                               * ITCL_WIDGET or ITCL_WIDGETADAPTOR */
     int objc,                /* number of arguments */
-    Tcl_Obj *CONST objv[],   /* argument objects */
+    Tcl_Obj *const objv[],   /* argument objects */
     ItclClass **iclsPtrPtr)  /* for returning iclsPtr */
 {
     Tcl_DString buffer;
@@ -1109,6 +1085,7 @@ ItclCheckForInitializedComponents(
             /*isProcCallFrame*/0) != TCL_OK) {
         return TCL_ERROR;
     }
+    idmPtr = NULL;
     FOREACH_HASH_VALUE(idmPtr, &iclsPtr->delegatedFunctions) {
         const char *val;
         /* check here for delegated typemethods only
@@ -1167,9 +1144,9 @@ ItclCheckForInitializedComponents(
     }
     Itcl_PopCallFrame(interp);
     if (result == TCL_ERROR) {
-        char *startStr;
-        char *sepStr;
-	char *objectStr;
+        const char *startStr;
+        const char *sepStr;
+	const char *objectStr;
         startStr = "";
 	sepStr = "";
 	objectStr = "";
@@ -1211,7 +1188,7 @@ Itcl_ClassInheritCmd(
     ClientData clientData,   /* info for all known objects */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
-    Tcl_Obj *CONST objv[])   /* argument objects */
+    Tcl_Obj *const objv[])   /* argument objects */
 {
     ItclObjectInfo *infoPtr = (ItclObjectInfo*)clientData;
     ItclClass *iclsPtr = (ItclClass*)Itcl_PeekStack(&infoPtr->clsStack);
@@ -1219,7 +1196,7 @@ Itcl_ClassInheritCmd(
     int i;
     int newEntry;
     int haveClasses;
-    char *token;
+    const char *token;
     Itcl_ListElem *elem;
     Itcl_ListElem *elem2;
     ItclClass *cdPtr;
@@ -1237,6 +1214,11 @@ Itcl_ClassInheritCmd(
         return TCL_ERROR;
     }
 
+    if (iclsPtr == NULL) {
+        Tcl_AppendResult(interp, "Error: ::itcl::parser::inherit called from",
+	        " not within a class", NULL);
+        return TCL_ERROR;
+    }
     /*
      *  An "inherit" statement can only be included once in a
      *  class definition.
@@ -1441,6 +1423,7 @@ Itcl_ClassInheritCmd(
     if (haveClasses) {
         result = Tcl_Eval(interp, Tcl_DStringValue(&buffer));
     }
+    Tcl_DStringFree(&buffer);
 
     return result;
 
@@ -1486,7 +1469,7 @@ Itcl_ClassProtectionCmd(
     ClientData clientData,   /* protection level (public/protected/private) */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
-    Tcl_Obj *CONST objv[])   /* argument objects */
+    Tcl_Obj *const objv[])   /* argument objects */
 {
     ProtectionCmdInfo *pInfo = (ProtectionCmdInfo*)clientData;
     int result;
@@ -1507,6 +1490,11 @@ Itcl_ClassProtectionCmd(
     } else {
 	/* something like: public variable a 123 456 */
         result = Itcl_EvalArgs(interp, objc-1, objv+1);
+	if (result == TCL_ERROR) {
+	    Tcl_ResetResult(interp);
+            Tcl_WrongNumArgs(interp, 1, objv, "command ?arg arg...? or wrong command name");
+            return TCL_ERROR;
+        }
     }
 
     if (result == TCL_BREAK) {
@@ -1563,7 +1551,7 @@ Itcl_ClassConstructorCmd(
     ClientData clientData,   /* info for all known objects */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
-    Tcl_Obj *CONST objv[])   /* argument objects */
+    Tcl_Obj *const objv[])   /* argument objects */
 {
     ItclObjectInfo *infoPtr = (ItclObjectInfo*)clientData;
     ItclClass *iclsPtr = (ItclClass*)Itcl_PeekStack(&infoPtr->clsStack);
@@ -1578,6 +1566,11 @@ Itcl_ClassConstructorCmd(
         return TCL_ERROR;
     }
 
+    if (iclsPtr == NULL) {
+        Tcl_AppendResult(interp, "Error: ::itcl::parser::constructor called from",
+	        " not within a class", NULL);
+        return TCL_ERROR;
+    }
     namePtr = objv[0];
     if (Tcl_FindHashEntry(&iclsPtr->functions, (char *)objv[0])) {
         Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
@@ -1632,7 +1625,7 @@ Itcl_ClassDestructorCmd(
     ClientData clientData,   /* info for all known objects */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
-    Tcl_Obj *CONST objv[])   /* argument objects */
+    Tcl_Obj *const objv[])   /* argument objects */
 {
     ItclObjectInfo *infoPtr = (ItclObjectInfo*)clientData;
     ItclClass *iclsPtr = (ItclClass*)Itcl_PeekStack(&infoPtr->clsStack);
@@ -1646,6 +1639,11 @@ Itcl_ClassDestructorCmd(
         return TCL_ERROR;
     }
 
+    if (iclsPtr == NULL) {
+        Tcl_AppendResult(interp, "Error: ::itcl::parser::destructor called from",
+	        " not within a class", NULL);
+        return TCL_ERROR;
+    }
     namePtr = objv[0];
     body = Tcl_GetString(objv[1]);
 
@@ -1681,7 +1679,7 @@ Itcl_ClassMethodCmd(
     ClientData clientData,   /* info for all known objects */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
-    Tcl_Obj *CONST objv[])   /* argument objects */
+    Tcl_Obj *const objv[])   /* argument objects */
 {
     Tcl_Obj *namePtr;
     Tcl_HashEntry *hPtr;
@@ -1697,6 +1695,11 @@ Itcl_ClassMethodCmd(
         return TCL_ERROR;
     }
 
+    if (iclsPtr == NULL) {
+        Tcl_AppendResult(interp, "Error: ::itcl::parser::method called from",
+	        " not within a class", NULL);
+        return TCL_ERROR;
+    }
     namePtr = objv[1];
 
     hPtr = Tcl_FindHashEntry(&iclsPtr->delegatedFunctions, (char *)objv[1]);
@@ -1739,7 +1742,7 @@ Itcl_ClassProcCmd(
     ClientData clientData,   /* info for all known objects */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
-    Tcl_Obj *CONST objv[])   /* argument objects */
+    Tcl_Obj *const objv[])   /* argument objects */
 {
     FOREACH_HASH_DECLS;
     Tcl_Obj *namePtr;
@@ -1769,6 +1772,11 @@ Itcl_ClassProcCmd(
         body = Tcl_GetString(objv[3]);
     }
 
+    if (iclsPtr == NULL) {
+        Tcl_AppendResult(interp, "Error: ::itcl::parser::proc called from",
+	        " not within a class", NULL);
+        return TCL_ERROR;
+    }
     if (iclsPtr->flags & (ITCL_TYPE|ITCL_WIDGETADAPTOR)) {
 	const char *name = Tcl_GetString(namePtr);
         /* check if the typemethod is already delegated */
@@ -1800,12 +1808,12 @@ Itcl_ClassProcCmd(
  *
  * ------------------------------------------------------------------------
  */
-int
+static int
 Itcl_ClassTypeMethodCmd(
     ClientData clientData,   /* info for all known objects */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
-    Tcl_Obj *CONST objv[])   /* argument objects */
+    Tcl_Obj *const objv[])   /* argument objects */
 {
     FOREACH_HASH_DECLS;
     Tcl_Obj *namePtr;
@@ -1825,6 +1833,11 @@ Itcl_ClassTypeMethodCmd(
 
     infoPtr = (ItclObjectInfo*)clientData;
     iclsPtr = (ItclClass*)Itcl_PeekStack(&infoPtr->clsStack);
+    if (iclsPtr == NULL) {
+        Tcl_AppendResult(interp, "Error: ::itcl::parser::typemethod called from",
+	        " not within a class", NULL);
+        return TCL_ERROR;
+    }
     namePtr = objv[1];
 
     arglist = NULL;
@@ -1876,7 +1889,7 @@ Itcl_ClassVariableCmd(
     ClientData clientData,   /* info for all known objects */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
-    Tcl_Obj *CONST objv[])   /* argument objects */
+    Tcl_Obj *const objv[])   /* argument objects */
 {
     Tcl_Obj *namePtr;
     ItclObjectInfo *infoPtr = (ItclObjectInfo*)clientData;
@@ -1885,7 +1898,7 @@ Itcl_ClassVariableCmd(
     char *init;
     char *config;
     char *arrayInitStr;
-    char *usageStr;
+    const char *usageStr;
     int pLevel;
     int haveError;
     int haveArrayInit;
@@ -1897,6 +1910,11 @@ Itcl_ClassVariableCmd(
     usageStr = NULL;
     arrayInitStr = NULL;
     ItclShowArgs(1, "Itcl_ClassVariableCmd", objc, objv);
+    if (iclsPtr == NULL) {
+        Tcl_AppendResult(interp, "Error: ::itcl::parser::variable called from",
+	        " not within a class", NULL);
+        return TCL_ERROR;
+    }
     pLevel = Itcl_Protection(interp, 0);
     if (iclsPtr->flags & (ITCL_TYPE|ITCL_WIDGET|ITCL_WIDGETADAPTOR)) {
         if (objc > 2) {
@@ -2051,7 +2069,7 @@ ItclInitClassCommon(
     Itcl_BuildVirtualTables(iclsPtr);
 
     if (initStr != NULL) {
-	CONST char *val;
+	const char *val;
         Tcl_DStringAppend(&buffer, "::", -1);
         Tcl_DStringAppend(&buffer, Tcl_GetString(ivPtr->namePtr), -1);
         val = Tcl_SetVar(interp,
@@ -2110,7 +2128,7 @@ ItclClassCommonCmd(
     ClientData clientData,   /* info for all known objects */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
-    Tcl_Obj *CONST objv[],   /* argument objects */
+    Tcl_Obj *const objv[],   /* argument objects */
     int protection,
     ItclVariable **ivPtrPtr)
 {
@@ -2119,7 +2137,7 @@ ItclClassCommonCmd(
     ItclVariable *ivPtr;
     Tcl_Obj *namePtr;
     char *arrayInitStr;
-    char *usageStr;
+    const char *usageStr;
     char *initStr;
     int haveError;
     int haveArrayInit;
@@ -2132,6 +2150,11 @@ ItclClassCommonCmd(
     arrayInitStr = NULL;
     *ivPtrPtr = NULL;
     ItclShowArgs(2, "Itcl_ClassCommonCmd", objc, objv);
+    if (iclsPtr == NULL) {
+        Tcl_AppendResult(interp, "Error: ::itcl::parser::common called from",
+	        " not within a class", NULL);
+        return TCL_ERROR;
+    }
     if (iclsPtr->flags & (ITCL_TYPE|ITCL_WIDGETADAPTOR)) {
         if (objc > 2) {
 	    if (strcmp(Tcl_GetString(objv[2]), "-array") == 0) {
@@ -2205,12 +2228,12 @@ ItclClassCommonCmd(
  *
  * ------------------------------------------------------------------------
  */
-int
+static int
 Itcl_ClassTypeVariableCmd(
     ClientData clientData,   /* info for all known objects */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
-    Tcl_Obj *CONST objv[])   /* argument objects */
+    Tcl_Obj *const objv[])   /* argument objects */
 {
     ItclVariable *ivPtr;
     int result;
@@ -2243,7 +2266,7 @@ Itcl_ClassCommonCmd(
     ClientData clientData,   /* info for all known objects */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
-    Tcl_Obj *CONST objv[])   /* argument objects */
+    Tcl_Obj *const objv[])   /* argument objects */
 {
     ItclVariable *ivPtr;
 
@@ -2321,12 +2344,12 @@ ItclDelObjectInfo(
  *
  * ------------------------------------------------------------------------
  */
-int
+static int
 Itcl_ClassFilterCmd(
     ClientData clientData,   /* info for all known objects */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
-    Tcl_Obj *CONST objv[])   /* argument objects */
+    Tcl_Obj *const objv[])   /* argument objects */
 {
     Tcl_Obj **newObjv;
     ItclObjectInfo *infoPtr;
@@ -2336,9 +2359,14 @@ Itcl_ClassFilterCmd(
     ItclShowArgs(1, "Itcl_ClassFilterCmd", objc, objv);
     infoPtr = (ItclObjectInfo*)clientData;
     iclsPtr = (ItclClass*)Itcl_PeekStack(&infoPtr->clsStack);
+    if (iclsPtr == NULL) {
+        Tcl_AppendResult(interp, "Error: ::itcl::parser::filter called from",
+	        " not within a class", NULL);
+        return TCL_ERROR;
+    }
     if (iclsPtr->flags & ITCL_CLASS) {
         Tcl_AppendResult(interp, "\"", Tcl_GetString(iclsPtr->namePtr),
-	        " is no ::itcl::widget/::itcl::widgetadaptor/::itcl::type", 
+	        " is no ::itcl::widget/::itcl::widgetadaptor/::itcl::type",
 		"/::itcl::extendedclass. Only these can have filters", NULL);
 	return TCL_ERROR;
     }
@@ -2370,12 +2398,12 @@ ItclShowArgs(1, "Itcl_ClassFilterCmd2", objc+2, newObjv);
  *
  * ------------------------------------------------------------------------
  */
-int
+static int
 Itcl_ClassMixinCmd(
     ClientData clientData,   /* info for all known objects */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
-    Tcl_Obj *CONST objv[])   /* argument objects */
+    Tcl_Obj *const objv[])   /* argument objects */
 {
     ItclShowArgs(0, "Itcl_ClassMixinCmd", objc, objv);
     return TCL_OK;
@@ -2391,12 +2419,12 @@ Itcl_ClassMixinCmd(
  *
  * ------------------------------------------------------------------------
  */
-int
+static int
 Itcl_WidgetCmd(
     ClientData clientData,   /* info for all known objects */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
-    Tcl_Obj *CONST objv[])   /* argument objects */
+    Tcl_Obj *const objv[])   /* argument objects */
 {
     ItclObjectInfo *infoPtr;
     int result;
@@ -2423,12 +2451,12 @@ Itcl_WidgetCmd(
  *
  * ------------------------------------------------------------------------
  */
-int
+static int
 Itcl_WidgetAdaptorCmd(
     ClientData clientData,   /* info for all known objects */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
-    Tcl_Obj *CONST objv[])   /* argument objects */
+    Tcl_Obj *const objv[])   /* argument objects */
 {
     ItclObjectInfo *infoPtr;
     int result;
@@ -2450,10 +2478,10 @@ Itcl_WidgetAdaptorCmd(
  *  ItclParseOption()
  *
  *  Invoked by Tcl during the parsing whenever
- *  the "option" command is invoked to define an option 
+ *  the "option" command is invoked to define an option
  *  Handles the following syntax:
  *
- *      option 
+ *      option
  *
  * ------------------------------------------------------------------------
  */
@@ -2480,8 +2508,8 @@ ItclParseOption(
     char *configureMethodVar;
     char *validateMethod;
     char *validateMethodVar;
-    char *token;
-    char *usage;
+    const char *token;
+    const char *usage;
     const char *optionName;
     const char **argv;
     const char *name;
@@ -2627,7 +2655,7 @@ ItclParseOption(
 	    newObjc++;
 	}
     }
-    
+
     if ((cgetMethod != NULL) && (cgetMethodVar != NULL)) {
         Tcl_AppendResult(interp,
 	        "option -cgetmethod and -cgetmethodvar cannot be used both",
@@ -2693,7 +2721,7 @@ ItclParseOption(
     }
     cp = name;
     while (*cp) {
-        if (isupper(*cp)) {
+        if (isupper(UCHAR(*cp))) {
 	    Tcl_AppendResult(interp, "bad option name \"", name, "\" ",
 	            ", options must not contain uppercase characters", NULL);
             result = TCL_ERROR;
@@ -2718,7 +2746,7 @@ ItclParseOption(
     if ((newObjc > 1) && (init == NULL)) {
         init = Tcl_GetString(newObjv[1]);
     }
-    
+
     ioptPtr = (ItclOption*)ckalloc(sizeof(ItclOption));
     memset(ioptPtr, 0, sizeof(ItclOption));
     ioptPtr->protection   = Itcl_Protection(interp, 0);
@@ -2783,10 +2811,10 @@ errorOut:
  *  Itcl_ClassOptionCmd()
  *
  *  Invoked by Tcl during the parsing of a class definition whenever
- *  the "option" command is invoked to define an option 
+ *  the "option" command is invoked to define an option
  *  Handles the following syntax:
  *
- *      option 
+ *      option
  *
  * ------------------------------------------------------------------------
  */
@@ -2795,7 +2823,7 @@ Itcl_ClassOptionCmd(
     ClientData clientData,   /* info for all known objects */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
-    Tcl_Obj *CONST objv[])   /* argument objects */
+    Tcl_Obj *const objv[])   /* argument objects */
 {
     ItclOption *ioptPtr;
     const char *tkPackage;
@@ -2805,6 +2833,11 @@ Itcl_ClassOptionCmd(
 
     ItclShowArgs(1, "Itcl_ClassOptionCmd", objc, objv);
 
+    if (iclsPtr == NULL) {
+        Tcl_AppendResult(interp, "Error: ::itcl::parser::option called from",
+	        " not within a class", NULL);
+        return TCL_ERROR;
+    }
     if (iclsPtr->flags & ITCL_CLASS) {
         Tcl_AppendResult(interp, "a \"class\" cannot have options", NULL);
 	return TCL_ERROR;
@@ -2903,19 +2936,19 @@ ItclCreateComponent(
  *  ItclHandleClassComponent()
  *
  *  Invoked by Tcl during the parsing of a class definition whenever
- *  the "component" command is invoked to define a component 
+ *  the "component" command is invoked to define a component
  *  Handles the following syntax:
  *
- *      component 
+ *      component
  *
  * ------------------------------------------------------------------------
  */
-int
+static int
 ItclHandleClassComponent(
     ClientData clientData,   /* info for all known objects */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
-    Tcl_Obj *CONST objv[],   /* argument objects */
+    Tcl_Obj *const objv[],   /* argument objects */
     ItclComponent **icPtrPtr)
 {
     Tcl_Obj **newObjv;
@@ -2938,11 +2971,16 @@ ItclHandleClassComponent(
     }
     infoPtr = (ItclObjectInfo*)clientData;
     iclsPtr = (ItclClass*)Itcl_PeekStack(&infoPtr->clsStack);
+    if (iclsPtr == NULL) {
+        Tcl_AppendResult(interp, "Error: ::itcl::parser::component called from",
+	        " not within a class", NULL);
+        return TCL_ERROR;
+    }
     usage = "component ?-public <typemethod>? ?-inherit ?<flag>??";
     if (iclsPtr->flags & ITCL_CLASS) {
         Tcl_AppendResult(interp, "\"", Tcl_GetString(iclsPtr->namePtr),
 	        " is no ::itcl::extendedclass/::itcl::widget",
-		"/::itcl::widgetadaptor/::itcl::type.", 
+		"/::itcl::widgetadaptor/::itcl::type.",
 		" Only these can have components", NULL);
 	return TCL_ERROR;
     }
@@ -3075,19 +3113,19 @@ ItclHandleClassComponent(
  *  Itcl_ClassComponentCmd()
  *
  *  Invoked by Tcl during the parsing of a class definition whenever
- *  the "component" command is invoked to define a component 
+ *  the "component" command is invoked to define a component
  *  Handles the following syntax:
  *
- *      component 
+ *      component
  *
  * ------------------------------------------------------------------------
  */
-int
+static int
 Itcl_ClassComponentCmd(
     ClientData clientData,   /* info for all known objects */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
-    Tcl_Obj *CONST objv[])   /* argument objects */
+    Tcl_Obj *const objv[])   /* argument objects */
 {
     ItclComponent *icPtr;
 
@@ -3099,19 +3137,19 @@ Itcl_ClassComponentCmd(
  *  Itcl_ClassTypeComponentCmd()
  *
  *  Invoked by Tcl during the parsing of a class definition whenever
- *  the "typecomponent" command is invoked to define a typecomponent 
+ *  the "typecomponent" command is invoked to define a typecomponent
  *  Handles the following syntax:
  *
- *      component 
+ *      component
  *
  * ------------------------------------------------------------------------
  */
-int
+static int
 Itcl_ClassTypeComponentCmd(
     ClientData clientData,   /* info for all known objects */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
-    Tcl_Obj *CONST objv[])   /* argument objects */
+    Tcl_Obj *const objv[])   /* argument objects */
 {
     ItclComponent *icPtr;
     int result;
@@ -3199,7 +3237,7 @@ ItclCreateDelegatedFunction(
  *  Itcl_HandleDelegateMethodCmd()
  *
  *  Invoked by Tcl during the parsing of a class definition whenever
- *  the "delegate method" command is invoked to define a 
+ *  the "delegate method" command is invoked to define a
  *  Handles the following syntax:
  *
  *      delegate method
@@ -3209,7 +3247,7 @@ ItclCreateDelegatedFunction(
 int
 Itcl_HandleDelegateMethodCmd(
     Tcl_Interp *interp,      /* current interpreter */
-    ItclObject *ioPtr,       /* != NULL for ::itcl::adddelegatedmethod 
+    ItclObject *ioPtr,       /* != NULL for ::itcl::adddelegatedmethod
                                 otherwise NULL */
     ItclClass *iclsPtr,      /* != NULL for delegate method otherwise NULL */
     ItclDelegatedFunction **idmPtrPtr,
@@ -3231,7 +3269,7 @@ Itcl_HandleDelegateMethodCmd(
     const char *component;
     const char *token;
     const char *whatName;
-    char *what;
+    const char *what;
     int result;
     int i;
     int foundOpt;
@@ -3363,7 +3401,7 @@ delegate method * ?to <componentName>? ?using <pattern>? ?except <methods>?";
 	if (ioPtr != NULL) {
 	} else {
 	    /* FIXME !! have to check the hierarchy !! */
-	    hPtr = Tcl_FindHashEntry(&iclsPtr->functions, 
+	    hPtr = Tcl_FindHashEntry(&iclsPtr->functions,
 	            (char *)methodNamePtr);
 
 	}
@@ -3387,19 +3425,19 @@ errorOut:
  *  Itcl_ClassDelegateMethodCmd()
  *
  *  Invoked by Tcl during the parsing of a class definition whenever
- *  the "delegate method" command is invoked to define a 
+ *  the "delegate method" command is invoked to define a
  *  Handles the following syntax:
  *
  *      delegate method
  *
  * ------------------------------------------------------------------------
  */
-int
+static int
 Itcl_ClassDelegateMethodCmd(
     ClientData clientData,   /* info for all known objects */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
-    Tcl_Obj *CONST objv[])   /* argument objects */
+    Tcl_Obj *const objv[])   /* argument objects */
 {
     Tcl_HashEntry *hPtr;
     ItclObjectInfo *infoPtr;
@@ -3415,10 +3453,15 @@ delegate method <methodName> ?to <componentName>? using <pattern>\n\
 delegate method * ?to <componentName>? ?using <pattern>? ?except <methods>?";
     infoPtr = (ItclObjectInfo*)clientData;
     iclsPtr = (ItclClass*)Itcl_PeekStack(&infoPtr->clsStack);
+    if (iclsPtr == NULL) {
+        Tcl_AppendResult(interp, "Error: ::itcl::parser::delegatemethod called from",
+	        " not within a class", NULL);
+        return TCL_ERROR;
+    }
     if (iclsPtr->flags & ITCL_CLASS) {
         Tcl_AppendResult(interp, "\"", Tcl_GetString(iclsPtr->namePtr),
 	        " is no ::itcl::widget/::itcl::widgetadaptor/::itcl::type",
-		"/::itcl::extendedclass.", 
+		"/::itcl::extendedclass.",
 		" Only these can delegate methods", NULL);
 	return TCL_ERROR;
     }
@@ -3450,13 +3493,13 @@ delegate method * ?to <componentName>? ?using <pattern>? ?except <methods>?";
 int
 Itcl_HandleDelegateOptionCmd(
     Tcl_Interp *interp,      /* current interpreter */
-    ItclObject *ioPtr,       /* != NULL for ::itcl::adddelgatedoption 
+    ItclObject *ioPtr,       /* != NULL for ::itcl::adddelgatedoption
                                 otherwise NULL */
     ItclClass *iclsPtr,      /* != NULL for delegate option otherwise NULL */
     ItclDelegatedOption **idoPtrPtr,
                              /* where to return idoPtr */
     int objc,                /* number of arguments */
-    Tcl_Obj *CONST objv[])   /* argument objects */
+    Tcl_Obj *const objv[])   /* argument objects */
 
 {
     Tcl_Obj *allOptionNamePtr;
@@ -3476,7 +3519,7 @@ Itcl_HandleDelegateOptionCmd(
     const char *component;
     const char *token;
     const char **argv;
-    char *what;
+    const char *what;
     const char *whatName;
     int foundOpt;
     int argc;
@@ -3547,7 +3590,7 @@ Itcl_HandleDelegateOptionCmd(
     }
     cp = option;
     while (*cp) {
-        if (isupper(*cp)) {
+        if (isupper(UCHAR(*cp))) {
 	    Tcl_AppendResult(interp, "bad option name \"", option, "\" ",
 	            ", options must not contain uppercase characters", NULL);
 	    ckfree((char *)argv);
@@ -3749,19 +3792,19 @@ errorOut1:
  *  Itcl_ClassDelegateOptionCmd()
  *
  *  Invoked by Tcl during the parsing of a class definition whenever
- *  the "delegate option" command is invoked to define a 
+ *  the "delegate option" command is invoked to define a
  *  Handles the following syntax:
  *
  *      delegate option
  *
  * ------------------------------------------------------------------------
  */
-int
+static int
 Itcl_ClassDelegateOptionCmd(
     ClientData clientData,   /* info for all known objects */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
-    Tcl_Obj *CONST objv[])   /* argument objects */
+    Tcl_Obj *const objv[])   /* argument objects */
 {
     Tcl_HashEntry *hPtr;
     ItclObjectInfo *infoPtr;
@@ -3779,10 +3822,15 @@ Itcl_ClassDelegateOptionCmd(
     }
     infoPtr = (ItclObjectInfo *)clientData;
     iclsPtr = (ItclClass *)Itcl_PeekStack(&infoPtr->clsStack);
+    if (iclsPtr == NULL) {
+        Tcl_AppendResult(interp, "Error: ::itcl::parser::delegateoption called from",
+	        " not within a class", NULL);
+        return TCL_ERROR;
+    }
     if (iclsPtr->flags & ITCL_CLASS) {
         Tcl_AppendResult(interp, "\"", Tcl_GetString(iclsPtr->namePtr),
 	        " is no ::itcl::widget/::itcl::widgetadaptor/::itcl::type",
-		"/::itcl::extendedclass.", 
+		"/::itcl::extendedclass.",
 		" Only these can delegate options", NULL);
 	return TCL_ERROR;
     }
@@ -3802,19 +3850,19 @@ Itcl_ClassDelegateOptionCmd(
  *  Itcl_ClassDelegateTypeMethodCmd()
  *
  *  Invoked by Tcl during the parsing of a class definition whenever
- *  the "delegate typemethod" command is invoked to define a 
+ *  the "delegate typemethod" command is invoked to define a
  *  Handles the following syntax:
  *
  *      delegate typemethod
  *
  * ------------------------------------------------------------------------
  */
-int
+static int
 Itcl_ClassDelegateTypeMethodCmd(
     ClientData clientData,   /* info for all known objects */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
-    Tcl_Obj *CONST objv[])   /* argument objects */
+    Tcl_Obj *const objv[])   /* argument objects */
 {
     Tcl_Obj *typeMethodNamePtr;
     Tcl_Obj *componentPtr;
@@ -3844,9 +3892,14 @@ delegate typemethod * ?to <componentName>? ?using <pattern>? ?except <typemethod
     icPtr = NULL;
     infoPtr = (ItclObjectInfo*)clientData;
     iclsPtr = (ItclClass*)Itcl_PeekStack(&infoPtr->clsStack);
+    if (iclsPtr == NULL) {
+        Tcl_AppendResult(interp, "Error: ::itcl::parser::delegatetypemethod called from",
+	        " not within a class", NULL);
+        return TCL_ERROR;
+    }
     if (iclsPtr->flags & ITCL_CLASS) {
         Tcl_AppendResult(interp, "\"", Tcl_GetString(iclsPtr->namePtr),
-	        " is no ::itcl::widget/::itcl::widgetadaptor/::itcl::type.", 
+	        " is no ::itcl::widget/::itcl::widgetadaptor/::itcl::type.",
 		" Only these can delegate typemethods", NULL);
 	return TCL_ERROR;
     }
@@ -3981,19 +4034,19 @@ delegate typemethod * ?to <componentName>? ?using <pattern>? ?except <typemethod
  * ------------------------------------------------------------------------
  *  Itcl_ClassForwardCmd()
  *
- *  Used similar to interp alias to forward the call of a method 
+ *  Used similar to interp alias to forward the call of a method
  *  to another method within the class
  *
  *  Returns TCL_OK/TCL_ERROR to indicate success/failure.
  * ------------------------------------------------------------------------
  */
 /* ARGSUSED */
-int
+static int
 Itcl_ClassForwardCmd(
     ClientData clientData,   /* unused */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
-    Tcl_Obj *CONST objv[])   /* argument objects */
+    Tcl_Obj *const objv[])   /* argument objects */
 {
     Tcl_Obj *prefixObj;
     Tcl_Method mPtr;
@@ -4003,10 +4056,15 @@ Itcl_ClassForwardCmd(
     ItclShowArgs(1, "Itcl_ClassForwardCmd", objc, objv);
     infoPtr = (ItclObjectInfo*)clientData;
     iclsPtr = (ItclClass*)Itcl_PeekStack(&infoPtr->clsStack);
+    if (iclsPtr == NULL) {
+        Tcl_AppendResult(interp, "Error: ::itcl::parser::forward called from",
+	        " not within a class", NULL);
+        return TCL_ERROR;
+    }
     if (iclsPtr->flags & ITCL_CLASS) {
         Tcl_AppendResult(interp, "\"", Tcl_GetString(iclsPtr->namePtr),
 	        " is no ::itcl::widget/::itcl::widgetadaptor/",
-		"::itcl::type/::itcl::extendedclass.", 
+		"::itcl::type/::itcl::extendedclass.",
 		" Only these can forward", NULL);
 	return TCL_ERROR;
     }
@@ -4026,19 +4084,19 @@ Itcl_ClassForwardCmd(
  * ------------------------------------------------------------------------
  *  Itcl_ClassMethodVariableCmd()
  *
- *  Used to similar to iterp alias to forward the call of a method 
+ *  Used to similar to iterp alias to forward the call of a method
  *  to another method within the class
  *
  *  Returns TCL_OK/TCL_ERROR to indicate success/failure.
  * ------------------------------------------------------------------------
  */
 /* ARGSUSED */
-int
+static int
 Itcl_ClassMethodVariableCmd(
     ClientData clientData,   /* unused */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
-    Tcl_Obj *CONST objv[])   /* argument objects */
+    Tcl_Obj *const objv[])   /* argument objects */
 {
     Tcl_Obj *namePtr;
     Tcl_Obj *defaultPtr;
@@ -4059,10 +4117,15 @@ Itcl_ClassMethodVariableCmd(
     ItclShowArgs(1, "Itcl_ClassMethodVariableCmd", objc, objv);
     infoPtr = (ItclObjectInfo*)clientData;
     iclsPtr = (ItclClass*)Itcl_PeekStack(&infoPtr->clsStack);
+    if (iclsPtr == NULL) {
+        Tcl_AppendResult(interp, "Error: ::itcl::parser::methodvariable called from",
+	        " not within a class", NULL);
+        return TCL_ERROR;
+    }
     if (iclsPtr->flags & ITCL_CLASS) {
         Tcl_AppendResult(interp, "\"", Tcl_GetString(iclsPtr->namePtr),
 	        " is no ::itcl::widget/::itcl::widgetadaptor/",
-		"::itcl::type/::itcl::extendedclass.", 
+		"::itcl::type/::itcl::extendedclass.",
 		" Only these can have methodvariables", NULL);
 	return TCL_ERROR;
     }
@@ -4136,7 +4199,7 @@ Itcl_ClassMethodVariableCmd(
     /* install a write trace if callbackPtr != NULL */
     /* FIXME to be done */
     ItclAddClassVariableDictInfo(interp, iclsPtr, ivPtr);
-    return TCL_OK;   
+    return TCL_OK;
 }
 
 /*
@@ -4151,12 +4214,12 @@ Itcl_ClassMethodVariableCmd(
  *
  * ------------------------------------------------------------------------
  */
-int
+static int
 Itcl_ClassTypeConstructorCmd(
     ClientData clientData,   /* info for all known objects */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
-    Tcl_Obj *CONST objv[])   /* argument objects */
+    Tcl_Obj *const objv[])   /* argument objects */
 {
     ItclObjectInfo *infoPtr = (ItclObjectInfo*)clientData;
     ItclClass *iclsPtr = (ItclClass*)Itcl_PeekStack(&infoPtr->clsStack);
@@ -4164,6 +4227,11 @@ Itcl_ClassTypeConstructorCmd(
 
     ItclShowArgs(1, "Itcl_ClassTypeConstructorCmd", objc, objv);
 
+    if (iclsPtr == NULL) {
+        Tcl_AppendResult(interp, "Error: ::itcl::parser::typeconstructor called from",
+	        " not within a class", NULL);
+        return TCL_ERROR;
+    }
     if (iclsPtr->flags & ITCL_CLASS) {
         Tcl_AppendResult(interp, "a \"class\" cannot have a typeconstructor",
 	        NULL);

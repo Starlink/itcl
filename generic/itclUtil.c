@@ -22,8 +22,6 @@
  *           http://www.tcltk.com/itcl
  *
  *  overhauled version author: Arnulf Wiedemann
- *
- *     RCS:  $Id: itclUtil.c,v 1.1.2.15 2009/01/24 19:56:15 wiede Exp $
  * ========================================================================
  *           Copyright (c) 1993-1998  Lucent Technologies, Inc.
  * ------------------------------------------------------------------------
@@ -78,8 +76,8 @@ static int itclPreserveInfoInitted = 0;
 
 void
 Itcl_Assert(testExpr, fileName, lineNumber)
-    CONST char *testExpr;   /* string representing test expression */
-    CONST char *fileName;   /* file name containing this call */
+    const char *testExpr;   /* string representing test expression */
+    const char *fileName;   /* file name containing this call */
     int lineNumber;	    /* line number containing this call */
 {
     Tcl_Panic("Itcl Assertion failed: \"%s\" (line %d of %s)",
@@ -897,10 +895,10 @@ Itcl_Protection(interp, newLevel)
  */
 void
 Itcl_ParseNamespPath(
-    CONST char *name,    /* path name to class member */
+    const char *name,    /* path name to class member */
     Tcl_DString *buffer, /* dynamic string buffer (uninitialized) */
-    char **head,         /* returns "namesp::namesp::namesp" part */
-    char **tail)         /* returns "element" part */
+    const char **head,   /* returns "namesp::namesp::namesp" part */
+    const char **tail)   /* returns "element" part */
 {
     register char *sep, *newname;
 
@@ -1115,7 +1113,7 @@ Itcl_CanAccessFunc(
 int
 Itcl_DecodeScopedCommand(
     Tcl_Interp *interp,		/* current interpreter */
-    CONST char *name,		/* string to be decoded */
+    const char *name,		/* string to be decoded */
     Tcl_Namespace **rNsPtr,	/* returns: namespace for scoped value */
     char **rCmdPtr)		/* returns: simple command word */
 {

@@ -24,8 +24,6 @@
  *           http://www.tcltk.com/itcl
  *
  *  overhauled version author: Arnulf Wiedemann
- *
- *     RCS:  $Id: itclMethod.c,v 1.1.2.48 2009/01/24 19:53:07 wiede Exp $
  * ========================================================================
  *           Copyright (c) 1993-1998  Lucent Technologies, Inc.
  * ------------------------------------------------------------------------
@@ -34,15 +32,13 @@
  */
 #include "itclInt.h"
 
-Tcl_ObjCmdProc Itcl_BiMyProcCmd;
-
 static int EquivArgLists(Tcl_Interp *interp, ItclArgList *origArgs,
         ItclArgList *realArgs);
 static int ItclCreateMemberCode(Tcl_Interp* interp, ItclClass *iclsPtr,
-        CONST char* arglist, CONST char* body, ItclMemberCode** mcodePtr,
+        const char* arglist, const char* body, ItclMemberCode** mcodePtr,
         Tcl_Obj *namePtr, int flags);
 static int ItclCreateMemberFunc(Tcl_Interp* interp, ItclClass *iclsPtr,
-	Tcl_Obj *namePtr, CONST char* arglist, CONST char* body,
+	Tcl_Obj *namePtr, const char* arglist, const char* body,
         ItclMemberFunc** imPtrPtr, int flags);
 
 
@@ -78,9 +74,9 @@ NRBodyCmd(
     Tcl_Obj *objPtr;
     ItclClass *iclsPtr;
     ItclMemberFunc *imPtr;
-    char *head;
-    char *tail;
-    char *token;
+    const char *head;
+    const char *tail;
+    const char *token;
     char *arglist;
     char *body;
     int status = TCL_OK;
@@ -167,7 +163,7 @@ Itcl_BodyCmd(
     int objc,
     Tcl_Obj *const *objv)
 {
-    return Itcl_NRCallObjProc(clientData, interp, NRBodyCmd, objc, objv);
+    return Tcl_NRCallObjProc(interp, NRBodyCmd, clientData, objc, objv);
 }
 
 
@@ -196,13 +192,13 @@ NRConfigBodyCmd(
     ClientData dummy,        /* unused */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
-    Tcl_Obj *CONST objv[])   /* argument objects */
+    Tcl_Obj *const objv[])   /* argument objects */
 {
     int status = TCL_OK;
 
-    char *head;
-    char *tail;
-    char *token;
+    const char *head;
+    const char *tail;
+    const char *token;
     Tcl_DString buffer;
     ItclClass *iclsPtr;
     ItclVarLookup *vlookup;
@@ -301,7 +297,7 @@ Itcl_ConfigBodyCmd(
     int objc,
     Tcl_Obj *const *objv)
 {
-    return Itcl_NRCallObjProc(clientData, interp, NRConfigBodyCmd, objc, objv);
+    return Tcl_NRCallObjProc(interp, NRConfigBodyCmd, clientData, objc, objv);
 }
 
 
@@ -323,8 +319,8 @@ Itcl_CreateMethod(
     Tcl_Interp* interp,  /* interpreter managing this action */
     ItclClass *iclsPtr,  /* class definition */
     Tcl_Obj *namePtr,    /* name of new method */
-    CONST char* arglist, /* space-separated list of arg names */
-    CONST char* body)    /* body of commands for the method */
+    const char* arglist, /* space-separated list of arg names */
+    const char* body)    /* body of commands for the method */
 {
     ItclMemberFunc *imPtr;
 
@@ -348,8 +344,8 @@ ItclCreateMethod(
     Tcl_Interp* interp,  /* interpreter managing this action */
     ItclClass *iclsPtr,  /* class definition */
     Tcl_Obj *namePtr,    /* name of new method */
-    CONST char* arglist, /* space-separated list of arg names */
-    CONST char* body,    /* body of commands for the method */
+    const char* arglist, /* space-separated list of arg names */
+    const char* body,    /* body of commands for the method */
     ItclMemberFunc **imPtrPtr)
 {
     ItclMemberFunc *imPtr;
@@ -444,12 +440,6 @@ Itcl_CreateProc(
  *  member function.
  * ------------------------------------------------------------------------
  */
-void Itcl_DeleteMemberFunc2 (
-    char *cdata)
-{
-    Itcl_DeleteMemberFunc(cdata);
-}
-
 static int
 ItclCreateMemberFunc(
     Tcl_Interp* interp,            /* interpreter managing this action */
@@ -644,7 +634,7 @@ ItclCreateMemberFunc(
 
     Tcl_SetHashValue(hPtr, (ClientData)imPtr);
     Itcl_PreserveData((ClientData)imPtr);
-    Itcl_EventuallyFree((ClientData)imPtr, Itcl_DeleteMemberFunc2);
+    Itcl_EventuallyFree((ClientData)imPtr, Itcl_DeleteMemberFunc);
 
     *imPtrPtr = imPtr;
     return TCL_OK;
@@ -670,8 +660,8 @@ Itcl_CreateMemberFunc(
     Tcl_Interp* interp,            /* interpreter managing this action */
     ItclClass *iclsPtr,            /* class definition */
     Tcl_Obj *namePtr,              /* name of new member */
-    CONST char* arglist,           /* space-separated list of arg names */
-    CONST char* body,              /* body of commands for the method */
+    const char* arglist,           /* space-separated list of arg names */
+    const char* body,              /* body of commands for the method */
     ItclMemberFunc** imPtrPtr)     /* returns: pointer to new method defn */
 {
     return ItclCreateMemberFunc(interp, iclsPtr, namePtr, arglist,
@@ -698,8 +688,8 @@ int
 Itcl_ChangeMemberFunc(
     Tcl_Interp* interp,            /* interpreter managing this action */
     ItclMemberFunc* imPtr,         /* command member being changed */
-    CONST char* arglist,           /* space-separated list of arg names */
-    CONST char* body)              /* body of commands for the method */
+    const char* arglist,           /* space-separated list of arg names */
+    const char* body)              /* body of commands for the method */
 {
     Tcl_HashEntry *hPtr;
     ItclMemberCode *mcode = NULL;
@@ -1019,8 +1009,8 @@ int
 Itcl_CreateMemberCode(
     Tcl_Interp* interp,            /* interpreter managing this action */
     ItclClass *iclsPtr,              /* class containing this member */
-    CONST char* arglist,           /* space-separated list of arg names */
-    CONST char* body,              /* body of commands for the method */
+    const char* arglist,           /* space-separated list of arg names */
+    const char* body,              /* body of commands for the method */
     ItclMemberCode** mcodePtr)     /* returns: pointer to new implementation */
 {
     return ItclCreateMemberCode(interp, iclsPtr, arglist, body, mcodePtr,
@@ -1139,16 +1129,30 @@ CallItclObjectCmd(
     Tcl_Interp *interp,
     int result)
 {
+    Tcl_Object oPtr;
     ItclMemberFunc *imPtr = data[0];
-    Tcl_Object oPtr = data[1];
-    Tcl_Obj **objv = data[3];
+    ItclObject *ioPtr = data[1];
     int objc = PTR2INT(data[2]);
+    Tcl_Obj **objv = data[3];
     
+    ItclShowArgs(1, "CallObjectCmd", objc, objv);
+    if (imPtr->flags & (ITCL_CONSTRUCTOR|ITCL_DESTRUCTOR)) {
+        oPtr = ioPtr->oPtr;
+    } else {
+        oPtr = NULL;
+    }
     if (oPtr != NULL) {
         result =  ItclObjectCmd(imPtr, interp, oPtr, imPtr->iclsPtr->clsPtr,
                 objc, objv);
     } else {
         result = ItclObjectCmd(imPtr, interp, NULL, NULL, objc, objv);
+    }
+    if (result != TCL_OK) {
+	if (ioPtr != NULL && ioPtr->hadConstructorError == 0) {
+	    /* we are in a constructor call and did not yet have an error */
+	    /* -1 means we are not in a constructor */
+            ioPtr->hadConstructorError = 1;
+	}
     }
     return result;
 }
@@ -1176,18 +1180,19 @@ CallConstructBase(
     int objc = PTR2INT(data[2]);
     Tcl_Obj *const* objv = data[3];
 
-    return Itcl_ConstructBase(interp, contextIoPtr, imPtr->iclsPtr,
+    result = Itcl_ConstructBase(interp, contextIoPtr, imPtr->iclsPtr,
 	        objc, objv);
+    return result;
 }
+
 int
 Itcl_EvalMemberCode(
     Tcl_Interp *interp,       /* current interpreter */
     ItclMemberFunc *imPtr,    /* member func, or NULL (for error messages) */
     ItclObject *contextIoPtr,   /* object context, or NULL */
     int objc,                 /* number of arguments */
-    Tcl_Obj *CONST objv[])    /* argument objects */
+    Tcl_Obj *const objv[])    /* argument objects */
 {
-    Tcl_Object oPtr;
     ItclMemberCode *mcode;
     void *callbackPtr;
     int result = TCL_OK;
@@ -1226,7 +1231,7 @@ Itcl_EvalMemberCode(
         contextIoPtr->constructed) {
 
         callbackPtr = Itcl_GetCurrentCallbackPtr(interp);
-        Itcl_NRAddCallback(interp, CallConstructBase, imPtr, contextIoPtr,
+        Tcl_NRAddCallback(interp, CallConstructBase, imPtr, contextIoPtr,
 	        INT2PTR(objc), (ClientData)objv);
         result = Itcl_NRRunCallbacks(interp, callbackPtr);
         if (result != TCL_OK) {
@@ -1266,12 +1271,7 @@ Itcl_EvalMemberCode(
     } else {
         if ((mcode->flags & ITCL_IMPLEMENT_TCL) != 0) {
             callbackPtr = Itcl_GetCurrentCallbackPtr(interp);
-	    if (imPtr->flags & (ITCL_CONSTRUCTOR|ITCL_DESTRUCTOR)) {
-	        oPtr = contextIoPtr->oPtr;
-	    } else {
-		oPtr = NULL;
-            }
-            Itcl_NRAddCallback(interp, CallItclObjectCmd, imPtr, oPtr,
+            Tcl_NRAddCallback(interp, CallItclObjectCmd, imPtr, contextIoPtr,
 	            INT2PTR(objc), (void *)objv);
             result = Itcl_NRRunCallbacks(interp, callbackPtr);
          }
@@ -1572,7 +1572,7 @@ NRExecMethod(
     ItclMemberFunc *imPtr = (ItclMemberFunc*)clientData;
     int result = TCL_OK;
 
-    char *token;
+    const char *token;
     Tcl_HashEntry *entry;
     ItclClass *iclsPtr;
     ItclObject *ioPtr;
@@ -1641,7 +1641,7 @@ Itcl_ExecMethod(
     int objc,
     Tcl_Obj *const *objv)
 {
-    return Itcl_NRCallObjProc(clientData, interp, NRExecMethod, objc, objv);
+    return Tcl_NRCallObjProc(interp, NRExecMethod, clientData, objc, objv);
 }
 
 
@@ -1664,7 +1664,7 @@ NRExecProc(
     ClientData clientData,   /* proc definition */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
-    Tcl_Obj *CONST objv[])   /* argument objects */
+    Tcl_Obj *const objv[])   /* argument objects */
 {
     ItclMemberFunc *imPtr = (ItclMemberFunc*)clientData;
     int result = TCL_OK;
@@ -1729,7 +1729,7 @@ Itcl_ExecProc(
     int objc,
     Tcl_Obj *const *objv)
 {
-    return Itcl_NRCallObjProc(clientData, interp, NRExecProc, objc, objv);
+    return Tcl_NRCallObjProc(interp, NRExecProc, clientData, objc, objv);
 }
 
 static int
@@ -1744,7 +1744,7 @@ CallInvokeMethodIfExists(
     Tcl_Obj* const* objv = data[3];
 
     result = Itcl_InvokeMethodIfExists(interp, "constructor",
-            iclsPtr, contextObj, objc, (Tcl_Obj* CONST*)objv);
+            iclsPtr, contextObj, objc, (Tcl_Obj* const*)objv);
 
     if (result != TCL_OK) {
         return TCL_ERROR;
@@ -1830,7 +1830,7 @@ Itcl_ConstructBase(
         (void) Tcl_ListObjGetElements((Tcl_Interp*)NULL, cmdlinePtr,
             &cmdlinec, &cmdlinev);
         callbackPtr = Itcl_GetCurrentCallbackPtr(interp);
-        Itcl_NRAddCallback(interp, CallPublicObjectCmd, contextClass,
+        Tcl_NRAddCallback(interp, CallPublicObjectCmd, contextClass,
 	        INT2PTR(cmdlinec), cmdlinev, NULL);
         result = Itcl_NRRunCallbacks(interp, callbackPtr);
 	Tcl_DecrRefCount(cmdlinev[0]);
@@ -1857,7 +1857,7 @@ Itcl_ConstructBase(
 	    Tcl_Obj *objPtr;
 
             callbackPtr = Itcl_GetCurrentCallbackPtr(interp);
-            Itcl_NRAddCallback(interp, CallInvokeMethodIfExists, iclsPtr,
+            Tcl_NRAddCallback(interp, CallInvokeMethodIfExists, iclsPtr,
 	            contextObj, INT2PTR(0), NULL);
             result = Itcl_NRRunCallbacks(interp, callbackPtr);
             if (result != TCL_OK) {
@@ -1908,11 +1908,11 @@ Itcl_ConstructBase(
 int
 Itcl_InvokeMethodIfExists(
     Tcl_Interp *interp,           /* interpreter */
-    CONST char *name,             /* name of desired method */
+    const char *name,             /* name of desired method */
     ItclClass *contextClassPtr,   /* current class being constructed */
     ItclObject *contextObjectPtr, /* object being constructed */
     int objc,                     /* number of arguments */
-    Tcl_Obj *CONST objv[])        /* argument objects */
+    Tcl_Obj *const objv[])        /* argument objects */
 {
     Tcl_HashEntry *hPtr;
     Tcl_Obj *cmdlinePtr;
@@ -1957,7 +1957,7 @@ Itcl_InvokeMethodIfExists(
         Tcl_DecrRefCount(cmdlinePtr);
     } else {
         if (contextClassPtr->flags &
-	        (ITCL_TYPE|ITCL_WIDGET|ITCL_WIDGETADAPTOR)) {
+	        (ITCL_ECLASS|ITCL_TYPE|ITCL_WIDGET|ITCL_WIDGETADAPTOR)) {
 	    if (strcmp(name, "constructor") == 0) {
                 if (objc > 0) {
                     if (contextClassPtr->numOptions == 0) {
@@ -2039,7 +2039,7 @@ Tcl_Command
 Itcl_CmdAliasProc(
     Tcl_Interp *interp,
     Tcl_Namespace *nsPtr,
-    CONST char *cmdName,
+    const char *cmdName,
     ClientData clientData)
 {
     Tcl_HashEntry *hPtr;
@@ -2161,7 +2161,7 @@ Tcl_Var
 Itcl_VarAliasProc(
     Tcl_Interp *interp,
     Tcl_Namespace *nsPtr,
-    CONST char *varName,
+    const char *varName,
     ClientData clientData)
 {
 
@@ -2274,14 +2274,15 @@ ItclCheckCallMethod(
     Tcl_Object oPtr;
     ItclObject *ioPtr;
     Tcl_HashEntry *hPtr;
+    Tcl_Obj *const * cObjv;
+    Tcl_Namespace *currNsPtr;
     ItclCallContext *callContextPtr;
     ItclCallContext *callContextPtr2;
     ItclMemberFunc *imPtr;
     int result;
     int isNew;
     int cObjc;
-    Tcl_Obj *const * cObjv;
-    Tcl_Namespace *currNsPtr;
+    int min_allowed_args;
 
     oPtr = NULL;
     hPtr = NULL;
@@ -2329,7 +2330,11 @@ ItclCheckCallMethod(
     }
     cObjc = Itcl_GetCallFrameObjc(interp);
     cObjv = Itcl_GetCallFrameObjv(interp);
-    if (cObjc-2 < imPtr->argcount) {
+    min_allowed_args = cObjc-2;
+    if (strcmp(Tcl_GetString(cObjv[0]), "next") == 0) {
+        min_allowed_args++;
+    }
+    if (min_allowed_args < imPtr->argcount) {
 	if (strcmp(Tcl_GetString(imPtr->namePtr), "info") == 0) {
             Tcl_Obj *objPtr = Tcl_NewStringObj(
 	            "wrong # args: should be one of...\n", -1);

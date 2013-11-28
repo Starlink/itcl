@@ -5,8 +5,6 @@
 #            Bell Labs Innovations for Lucent Technologies
 #            mmclennan@lucent.com
 #            http://www.tcltk.com/itcl
-#
-#      RCS:  $Id: protection.test,v 1.4.2.1 2009/01/02 19:12:12 dgp Exp $
 # ----------------------------------------------------------------------
 #            Copyright (c) 1993-1998  Lucent Technologies, Inc.
 # ======================================================================
@@ -16,6 +14,7 @@
 package require tcltest 2.1
 namespace import ::tcltest::test
 ::tcltest::loadTestedCommands
+package require itcl
 
 # ----------------------------------------------------------------------
 #  Class members are protected by access restrictions

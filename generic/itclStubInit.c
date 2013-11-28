@@ -1,16 +1,14 @@
 /*
- * $Id: itclStubInit.c,v 1.4.2.9 2008/10/09 16:30:34 wiede Exp $
- *
  * This file is (mostly) automatically generated from itcl.decls.
  * It is compiled and linked in with the itcl package proper.
  */
 
-#include "itcl.h"
 #include "itclInt.h"
 
+MODULE_SCOPE const ItclStubs itclStubs;
 /* !BEGIN!: Do not edit below this line. */
 
-ItclIntStubs itclIntStubs = {
+static const ItclIntStubs itclIntStubs = {
     TCL_STUB_MAGIC,
     ITCLINT_STUBS_EPOCH,
     ITCLINT_STUBS_REVISION,
@@ -191,19 +189,21 @@ ItclIntStubs itclIntStubs = {
     Itcl_RenameCommand, /* 173 */
     Itcl_PushCallFrame, /* 174 */
     Itcl_PopCallFrame, /* 175 */
+    Itcl_GetUplevelCallFrame, /* 176 */
+    Itcl_ActivateCallFrame, /* 177 */
 };
 
-static ItclStubHooks itclStubHooks = {
+static const ItclStubHooks itclStubHooks = {
     &itclIntStubs
 };
 
-ItclStubs itclStubs = {
+const ItclStubs itclStubs = {
     TCL_STUB_MAGIC,
     ITCL_STUBS_EPOCH,
     ITCL_STUBS_REVISION,
     &itclStubHooks,
-    Itcl_Init, /* 0 */
-    Itcl_SafeInit, /* 1 */
+    0, /* 0 */
+    0, /* 1 */
     Itcl_RegisterC, /* 2 */
     Itcl_RegisterObjC, /* 3 */
     Itcl_FindC, /* 4 */
@@ -231,8 +231,3 @@ ItclStubs itclStubs = {
 };
 
 /* !END!: Do not edit above this line. */
-
-struct ItclStubAPI itclStubAPI = {
-    &itclStubs,
-    &itclIntStubs
-};

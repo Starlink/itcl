@@ -10,18 +10,15 @@
 #       Test cases for ::itcl::type proc, method, typemethod commands.
 #       Uses the ::tcltest:: harness.
 #
-#       There is at least Tcl 8.6a3 needed
-#
 #    The tests assume tcltest 2.2
 #-----------------------------------------------------------------------
 
-package require Tcl 8.6
 package require tcltest 2.2
 namespace import ::tcltest::*
+::tcltest::loadTestedCommands
+package require itcl
 
 interp alias {} type {} ::itcl::type
-
-loadTestedCommands
 
 #-----------------------------------------------------------------------
 # Options
@@ -179,10 +176,10 @@ test option-2.1 {configure returns info, local options only} -body {
     dog create spot
     spot configure -color red
     spot configure -akc 0
-    spot configure
+    lsort [spot configure]
 } -cleanup {
     dog destroy
-} -result {{-color color Color black red} {-akc akc Akc 1 0}}
+} -result {{-akc akc Akc 1 0} {-color color Color black red}}
 
 test option-2.2 {configure -opt returns info, local options only} -body {
     type dog {

@@ -8,139 +8,127 @@
  *
  * See the file "license.terms" for information on usage and redistribution of
  * this file, and for a DISCLAIMER OF ALL WARRANTIES.
- *
- * RCS: @(#) $Id: itclBase.c,v 1.1.2.40 2009/01/24 19:29:36 wiede Exp $
  */
 
 #include <stdlib.h>
 #include "itclInt.h"
-#include <tclOODecls.h>
 
-Tcl_ObjCmdProc ItclFinishCmd;
-Tcl_ObjCmdProc ItclSetHullWindowName;
-Tcl_ObjCmdProc ItclCheckSetItclHull;
+static Tcl_ObjCmdProc ItclFinishCmd;
+static Tcl_ObjCmdProc ItclSetHullWindowName;
+static Tcl_ObjCmdProc ItclCheckSetItclHull;
 
 #ifdef OBJ_REF_COUNT_DEBUG
-Tcl_ObjCmdProc ItclDumpRefCountInfo;
+static Tcl_ObjCmdProc ItclDumpRefCountInfo;
 #endif
 
 #ifdef ITCL_PRESERVE_DEBUG
-Tcl_ObjCmdProc ItclDumpPreserveInfo;
+static Tcl_ObjCmdProc ItclDumpPreserveInfo;
 #endif
 
-extern struct ItclStubAPI itclStubAPI;
+MODULE_SCOPE const ItclStubs itclStubs;
 
-static int Initialize _ANSI_ARGS_((Tcl_Interp *interp));
+static int Initialize(Tcl_Interp *interp);
 
-static char initScript[] = "\n\
-namespace eval ::itcl {\n\
-    proc _find_init {} {\n\
-        global env tcl_library\n\
-        variable library\n\
-        variable patchLevel\n\
-        rename _find_init {}\n\
-        if {[info exists library]} {\n\
-            lappend dirs $library\n\
-        } else {\n\
-            if {[catch {uplevel #0 source -rsrc itcl}] == 0} {\n\
-                return\n\
-            }\n\
-            set dirs {}\n\
-            if {[info exists env(ITCL_LIBRARY)]} {\n\
-                lappend dirs $env(ITCL_LIBRARY)\n\
-            }\n\
-            lappend dirs [file join [file dirname $tcl_library] itcl$patchLevel]\n\
-            set bindir [file dirname [info nameofexecutable]]\n\
-	    lappend dirs [file join . library]\n\
-            lappend dirs [file join $bindir .. lib itcl$patchLevel]\n\
-            lappend dirs [file join $bindir .. library]\n\
-            lappend dirs [file join $bindir .. .. library]\n\
-            lappend dirs [file join $bindir .. .. itcl library]\n\
-            lappend dirs [file join $bindir .. .. .. itcl library]\n\
-            lappend dirs [file join $bindir .. .. itcl-ng itcl library]\n\
-            # On MacOSX, check the directories in the tcl_pkgPath\n\
-            if {[string equal $::tcl_platform(platform) \"unix\"] && \
-                    [string equal $::tcl_platform(os) \"Darwin\"]} {\n\
-                foreach d $::tcl_pkgPath {\n\
-                    lappend dirs [file join $d itcl$patchLevel]\n\
-                }\n\
-            }\n\
-            # On *nix, check the directories in the tcl_pkgPath\n\
-            if {[string equal $::tcl_platform(platform) \"unix\"]} {\n\
-                foreach d $::tcl_pkgPath {\n\
-                    lappend dirs $d\n\
-                    lappend dirs [file join $d itcl$patchLevel]\n\
-                }\n\
-            }\n\
-        }\n\
-        foreach i $dirs {\n\
-            set library $i\n\
-            set itclfile [file join $i itcl.tcl]\n\
-            if {![catch {uplevel #0 [list source $itclfile]} msg]} {\n\
-                return\n\
-            }\n\
-        }\n\
-        set msg \"Can't find a usable itcl.tcl in the following directories:\n\"\n\
-        append msg \"    $dirs\n\"\n\
-        append msg \"This probably means that Itcl/Tcl weren't installed properly.\n\"\n\
-        append msg \"If you know where the Itcl library directory was installed,\n\"\n\
-        append msg \"you can set the environment variable ITCL_LIBRARY to point\n\"\n\
-        append msg \"to the library directory.\n\"\n\
-        error $msg\n\
-    }\n\
-    _find_init\n\
-}";
+static const char initScript[] =
+"namespace eval ::itcl {\n"
+"    proc _find_init {} {\n"
+"        global env tcl_library\n"
+"        variable library\n"
+"        variable patchLevel\n"
+"        rename _find_init {}\n"
+"        if {[info exists library]} {\n"
+"            lappend dirs $library\n"
+"        } else {\n"
+"            set dirs {}\n"
+"            if {[info exists env(ITCL_LIBRARY)]} {\n"
+"                lappend dirs $env(ITCL_LIBRARY)\n"
+"            }\n"
+"            lappend dirs [file join [file dirname $tcl_library] itcl$patchLevel]\n"
+"            set bindir [file dirname [info nameofexecutable]]\n"
+"            lappend dirs [file join . library]\n"
+"            lappend dirs [file join $bindir .. lib itcl$patchLevel]\n"
+"            lappend dirs [file join $bindir .. library]\n"
+"            lappend dirs [file join $bindir .. .. library]\n"
+"            lappend dirs [file join $bindir .. .. itcl library]\n"
+"            lappend dirs [file join $bindir .. .. .. itcl library]\n"
+"            lappend dirs [file join $bindir .. .. itcl-ng itcl library]\n"
+"            # On *nix, check the directories in the tcl_pkgPath\n"
+"            # XXX JH - this looks unnecessary, maybe Darwin only?\n"
+"            if {[string equal $::tcl_platform(platform) \"unix\"]} {\n"
+"                foreach d $::tcl_pkgPath {\n"
+"                    lappend dirs $d\n"
+"                    lappend dirs [file join $d itcl$patchLevel]\n"
+"                }\n"
+"            }\n"
+"        }\n"
+"        foreach i $dirs {\n"
+"            set library $i\n"
+"            if {![catch {uplevel #0 [list source [file join $i itcl.tcl]]}]} {\n"
+"                set library $i\n"
+"                return\n"
+"            }\n"
+"        }\n"
+"        set msg \"Can't find a usable itcl.tcl in the following directories:\n\"\n"
+"        append msg \"    $dirs\n\"\n"
+"        append msg \"This probably means that Itcl/Tcl weren't installed properly.\n\"\n"
+"        append msg \"If you know where the Itcl library directory was installed,\n\"\n"
+"        append msg \"you can set the environment variable ITCL_LIBRARY to point\n\"\n"
+"        append msg \"to the library directory.\n\"\n"
+"        error $msg\n"
+"    }\n"
+"    _find_init\n"
+"}";
 
 /*
  * The following script is used to initialize Itcl in a safe interpreter.
  */
 
-static char safeInitScript[] =
-"proc ::itcl::local {class name args} {\n\
-    set ptr [uplevel [list $class $name] $args]\n\
-    uplevel [list set itcl-local-$ptr $ptr]\n\
-    set cmd [uplevel namespace which -command $ptr]\n\
-    uplevel [list trace variable itcl-local-$ptr u \"::itcl::delete object $cmd; list\"]\n\
-    return $ptr\n\
-}";
+static const char safeInitScript[] =
+"proc ::itcl::local {class name args} {\n"
+"    set ptr [uplevel [list $class $name] $args]\n"
+"    uplevel [list set itcl-local-$ptr $ptr]\n"
+"    set cmd [uplevel namespace which -command $ptr]\n"
+"    uplevel [list trace variable itcl-local-$ptr u \"::itcl::delete object $cmd; list\"]\n"
+"    return $ptr\n"
+"}";
 
-static char *clazzClassScript = "set itclClass [::oo::class create ::itcl::clazz]; \
-    ::oo::define $itclClass superclass ::oo::class";
+static const char *clazzClassScript =
+"set itclClass [::oo::class create ::itcl::clazz]\n"
+"::oo::define $itclClass superclass ::oo::class";
 
 
-static char *clazzUnknownBody = "\n\
-    set mySelf [::oo::Helpers::self]\n\
-    if {[::itcl::is class $mySelf]} {\n\
-        set namespace [uplevel 1 namespace current]\n\
-        set my_namespace $namespace\n\
-        if {$my_namespace ne \"::\"} {\n\
-            set my_namespace ${my_namespace}::\n\
-        }\n\
-        set my_class [::itcl::find classes ${my_namespace}$m]\n\
-        if {[string length $my_class] > 0} {\n\
-            # class already exists, it is a redefinition, so delete old class first\n\
-	    ::itcl::delete class $my_class\n\
-        }\n\
-        set cmd [uplevel 1 ::info command ${my_namespace}$m]\n\
-        if {[string length $cmd] > 0} {\n\
-            error \"command \\\"$m\\\" already exists in namespace \\\"$namespace\\\"\"\n\
-        }\n\
-    } \n\
-    set myns [uplevel namespace current]\n\
-    if {$myns ne \"::\"} {\n\
-       set myns ${myns}::\n\
-    }\n\
-    set myObj [lindex [::info level 0] 0]\n\
-    set cmd [list uplevel 1 ::itcl::parser::handleClass $myObj $mySelf $m {*}[list $args]]\n\
-    set myErrorInfo {}\n\
-    set obj {}\n\
-    if {[catch {\n\
-        eval $cmd\n\
-    } obj myErrorInfo]} {\n\
-	return -code error -errorinfo $::errorInfo $obj\n\
-    }\n\
-    return $obj\n\
-";
+static const char *clazzUnknownBody =
+"    set mySelf [::oo::Helpers::self]\n"
+"    if {[::itcl::is class $mySelf]} {\n"
+"        set namespace [uplevel 1 namespace current]\n"
+"        set my_namespace $namespace\n"
+"        if {$my_namespace ne \"::\"} {\n"
+"            set my_namespace ${my_namespace}::\n"
+"        }\n"
+"        set my_class [::itcl::find classes ${my_namespace}$m]\n"
+"        if {[string length $my_class] > 0} {\n"
+"            # class already exists, it is a redefinition, so delete old class first\n"
+"	    ::itcl::delete class $my_class\n"
+"        }\n"
+"        set cmd [uplevel 1 [list ::info command ${my_namespace}$m]]\n"
+"        if {[string length $cmd] > 0} {\n"
+"            error \"command \\\"$m\\\" already exists in namespace \\\"$namespace\\\"\"\n"
+"        }\n"
+"    } \n"
+"    set myns [uplevel namespace current]\n"
+"    if {$myns ne \"::\"} {\n"
+"       set myns ${myns}::\n"
+"    }\n"
+"    set myObj [lindex [::info level 0] 0]\n"
+"    set cmd [list uplevel 1 ::itcl::parser::handleClass $myObj $mySelf $m {*}[list $args]]\n"
+"    set myErrorInfo {}\n"
+"    set obj {}\n"
+"    if {[catch {\n"
+"        eval $cmd\n"
+"    } obj myErrorInfo]} {\n"
+"	return -code error -errorinfo $::errorInfo $obj\n"
+"    }\n"
+"    return $obj\n";
 
 #define ITCL_IS_ENSEMBLE 0x1
 
@@ -211,7 +199,7 @@ AddClassUnknowMethod(
  *
  * ------------------------------------------------------------------------
  */
-void
+static void
 FreeItclObjectInfo(
     ClientData clientData)
 {
@@ -478,8 +466,8 @@ Initialize (
      *  Package is now loaded.
      */
 
-    Tcl_PkgProvideEx(interp, "Itcl", ITCL_PATCH_LEVEL, &itclStubAPI);
-    return Tcl_PkgProvideEx(interp, "itcl", ITCL_PATCH_LEVEL, &itclStubAPI);
+    Tcl_PkgProvideEx(interp, "Itcl", ITCL_PATCH_LEVEL, &itclStubs);
+    return Tcl_PkgProvideEx(interp, "itcl", ITCL_PATCH_LEVEL, &itclStubs);
 }
 
 /*
@@ -603,7 +591,7 @@ ItclCallCCommand(
  *
  * ------------------------------------------------------------------------
  */
-int
+static int
 ItclSetHullWindowName(
     ClientData clientData,   /* infoPtr */
     Tcl_Interp *interp,      /* current interpreter */
@@ -627,7 +615,7 @@ ItclSetHullWindowName(
  *
  * ------------------------------------------------------------------------
  */
-int
+static int
 ItclCheckSetItclHull(
     ClientData clientData,   /* infoPtr */
     Tcl_Interp *interp,      /* current interpreter */
@@ -696,7 +684,7 @@ ItclCheckSetItclHull(
  *
  * ------------------------------------------------------------------------
  */
-int
+static int
 ItclFinishCmd(
     ClientData clientData,   /* unused */
     Tcl_Interp *interp,      /* current interpreter */
@@ -896,12 +884,12 @@ void Tcl_DbDumpRefCountInfo(const char *fileName, int noDeleted);
  *
  * ------------------------------------------------------------------------
  */
-int
+static int
 ItclDumpRefCountInfo(
     ClientData clientData,   /* unused */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
-    Tcl_Obj *CONST objv[])   /* argument objects */
+    Tcl_Obj *const objv[])   /* argument objects */
 {
     int noDeleted;
 
@@ -930,12 +918,12 @@ void Itcl_DbDumpPreserveInfo(const char *fileName);
  *
  * ------------------------------------------------------------------------
  */
-int
+static int
 ItclDumpPreserveInfo(
     ClientData clientData,   /* unused */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
-    Tcl_Obj *CONST objv[])   /* argument objects */
+    Tcl_Obj *const objv[])   /* argument objects */
 {
     ItclShowArgs(0, "ItclDumpPreserveInfo", objc, objv);
     Itcl_DbDumpPreserveInfo(NULL);

@@ -9,16 +9,14 @@
  * ========================================================================
  *  AUTHOR:  Arnulf Wiedemann
  *
- *     RCS:  $Id: itclMigrate2TclCore.c,v 1.1.2.10 2009/01/14 22:43:24 davygrvy Exp $
  * ========================================================================
  *           Copyright (c) 1993-1998  Lucent Technologies, Inc.
  * ------------------------------------------------------------------------
  * See the file "license.terms" for information on usage and redistribution
  * of this file, and for a DISCLAIMER OF ALL WARRANTIES.
  */
-#include <tcl.h>
 #include <tclInt.h>
-#include "itclMigrate2TclCore.h"
+#include "itclInt.h"
 
 int
 Itcl_SetCallFrameResolver(
@@ -34,62 +32,6 @@ Itcl_SetCallFrameResolver(
         return TCL_OK;
     }
     return TCL_ERROR;
-}
-
-Tcl_HashTable *
-_Tcl_GetNamespaceCommandTable(
-    Tcl_Namespace *nsPtr)
-{
-    return &((Namespace *)nsPtr)->cmdTable;
-}
-
-Tcl_HashTable *
-_Tcl_GetNamespaceChildTable(
-    Tcl_Namespace *nsPtr)
-{
-    return &((Namespace *)nsPtr)->childTable;
-}
-
-int
-_Tcl_InitRewriteEnsemble(
-    Tcl_Interp *interp,
-    int numRemoved,
-    int numInserted,
-    int objc,
-    Tcl_Obj *const *objv)
-{
-    Interp *iPtr = (Interp *) interp;
-
-    int isRootEnsemble = (iPtr->ensembleRewrite.sourceObjs == NULL);
-
-    if (isRootEnsemble) {
-        iPtr->ensembleRewrite.sourceObjs = objv;
-        iPtr->ensembleRewrite.numRemovedObjs = numRemoved;
-        iPtr->ensembleRewrite.numInsertedObjs = numInserted;
-    } else {
-        int numIns = iPtr->ensembleRewrite.numInsertedObjs;
-        if (numIns < numRemoved) {
-            iPtr->ensembleRewrite.numRemovedObjs += numRemoved - numIns;
-            iPtr->ensembleRewrite.numInsertedObjs += numInserted - 1;
-        } else {
-            iPtr->ensembleRewrite.numInsertedObjs += numInserted - numRemoved;
-        }
-    }
-    return isRootEnsemble;
-}
-
-void
-_Tcl_ResetRewriteEnsemble(
-    Tcl_Interp *interp,
-    int isRootEnsemble)
-{
-    Interp *iPtr = (Interp *) interp;
-
-    if (isRootEnsemble) {
-        iPtr->ensembleRewrite.sourceObjs = NULL;
-        iPtr->ensembleRewrite.numRemovedObjs = 0;
-        iPtr->ensembleRewrite.numInsertedObjs = 0;
-    }
 }
 
 int
@@ -124,6 +66,40 @@ Tcl_NewNamespaceVar(
     TclSetVarNamespaceVar(varPtr);
     VarHashRefCount(varPtr)++;
     return (Tcl_Var)varPtr;
+}
+
+Tcl_CallFrame *
+Itcl_GetUplevelCallFrame(
+    Tcl_Interp *interp,
+    int level)
+{
+    CallFrame *framePtr;
+    if (level < 0) {
+        return NULL;
+    }
+    framePtr = ((Interp *)interp)->framePtr;
+    while ((framePtr != NULL) && (level-- > 0)) {
+        framePtr = framePtr->callerVarPtr;
+    }
+    if (framePtr == NULL) {
+        return NULL;
+    }
+    return (Tcl_CallFrame *)framePtr;
+}
+
+
+Tcl_CallFrame *
+Itcl_ActivateCallFrame(
+    Tcl_Interp *interp,
+    Tcl_CallFrame *framePtr)
+{
+    Interp *iPtr = (Interp*)interp;
+    CallFrame *oldFramePtr;
+
+    oldFramePtr = iPtr->varFramePtr;
+    iPtr->varFramePtr = (CallFrame *) framePtr;
+
+    return (Tcl_CallFrame *) oldFramePtr;
 }
 
 Tcl_Namespace *
@@ -222,7 +198,7 @@ Itcl_IsCallFrameArgument(
                     return 1;
                 }
             }
-        }            
+        }
     }
     return 0;
 }

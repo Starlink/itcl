@@ -8,8 +8,6 @@
  *
  * See the file "license.terms" for information on usage and redistribution of
  * this file, and for a DISCLAIMER OF ALL WARRANTIES.
- *
- * RCS: @(#) $Id: itclHelpers.c,v 1.1.2.14 2009/01/24 20:46:34 wiede Exp $
  */
 
 #include "itclInt.h"
@@ -54,7 +52,7 @@ ItclShowArgs(
  *  a pointer to this string.
  * ------------------------------------------------------------------------
  */
-char*
+const char*
 Itcl_ProtectionStr(
     int pLevel)     /* protection level */
 {
@@ -243,7 +241,7 @@ int
 Itcl_EvalArgs(
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
-    Tcl_Obj *CONST objv[])   /* argument objects */
+    Tcl_Obj *const objv[])   /* argument objects */
 {
     int result;
     Tcl_Command cmd;
@@ -363,7 +361,7 @@ ItclEnsembleSubCmd(
     ItclShowArgs(2, functionName, objc, objv);
 
     newObjv = (Tcl_Obj **)ckalloc(sizeof(Tcl_Obj *)*(objc+1));
-    isRootEnsemble = Tcl_InitRewriteEnsemble(interp, 1, 2, objc, objv);
+    isRootEnsemble = Itcl_InitRewriteEnsemble(interp, 1, 2, objc, objv);
     newObjv[0] = Tcl_NewStringObj("::info", -1);
     Tcl_IncrRefCount(newObjv[0]);
     newObjv[1] = Tcl_NewStringObj("itclinfo", -1);
@@ -375,7 +373,7 @@ ItclEnsembleSubCmd(
     Tcl_DecrRefCount(newObjv[0]);
     Tcl_DecrRefCount(newObjv[1]);
     ckfree((char *)newObjv);
-    Tcl_ResetRewriteEnsemble(interp, isRootEnsemble);
+    Itcl_ResetRewriteEnsemble(interp, isRootEnsemble);
     return result;
 }
 
@@ -440,7 +438,7 @@ ItclCapitalize(
     Tcl_Obj *objPtr;
     char buf[2];
     
-    sprintf(buf, "%c", toupper(*str));
+    sprintf(buf, "%c", toupper(UCHAR(*str)));
     buf[1] = '\0';
     objPtr = Tcl_NewStringObj(buf, -1);
     Tcl_AppendToObj(objPtr, str+1, -1);
@@ -1148,7 +1146,7 @@ ItclAddClassVariableDictInfo(
     Tcl_Obj *valuePtr1;
     Tcl_Obj *valuePtr2;
     Tcl_Obj *listPtr;
-    char *cp;
+    const char *cp;
     int haveFlags;
     int newValue1;
 
@@ -1300,7 +1298,7 @@ ItclAddClassFunctionDictInfo(
     Tcl_Obj *valuePtr1;
     Tcl_Obj *valuePtr2;
     Tcl_Obj *listPtr;
-    char *cp;
+    const char *cp;
     int haveFlags;
     int newValue1;
 

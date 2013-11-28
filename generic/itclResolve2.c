@@ -8,14 +8,13 @@
  * ========================================================================
  *  AUTHOR:  Arnulf Wiedemann
  *
- *     RCS:  $Id: itclResolve2.c,v 1.1.2.3 2009/01/07 19:38:50 wiede Exp $
  * ========================================================================
  *           Copyright (c) Arnulf Wiedemann
  * ------------------------------------------------------------------------
  * See the file "license.terms" for information on usage and redistribution
  * of this file, and for a DISCLAIMER OF ALL WARRANTIES.
  */
-#include "tclInt.h"
+#include <tclInt.h>
 #include "itclInt.h"
 #include "itclVCInt.h"
 
@@ -80,7 +79,7 @@ Itcl_CheckClassCommandProtection(
 int
 Itcl_ClassCmdResolver2(
     Tcl_Interp *interp,		/* current interpreter */
-    CONST char* name,		/* name of the command being accessed */
+    const char* name,		/* name of the command being accessed */
     Tcl_Namespace *nsPtr,	/* namespace performing the resolution */
     int flags,			/* TCL_LEAVE_ERR_MSG => leave error messages
 				 *   in interp if anything goes wrong */
@@ -166,7 +165,7 @@ Itcl_ClassCmdResolver2(
 int
 Itcl_ClassVarResolver2(
     Tcl_Interp *interp,       /* current interpreter */
-    CONST char* name,	      /* name of the variable being accessed */
+    const char* name,	      /* name of the variable being accessed */
     Tcl_Namespace *nsPtr,   /* namespace performing the resolution */
     int flags,                /* TCL_LEAVE_ERR_MSG => leave error messages
                                *   in interp if anything goes wrong */
@@ -236,7 +235,7 @@ Itcl_ClassVarResolver2(
              *  If this is an instance variable, then we have to
              *  find the object context,
              */
-    
+
             if ((callContextPtr != NULL) && (callContextPtr->ioPtr != NULL)) {
                 contextIoPtr = callContextPtr->ioPtr;
                 hPtr = Tcl_FindHashEntry(&iriPtr->objectVarsTables,
@@ -307,7 +306,7 @@ Itcl_ClassVarResolver2(
 int
 Itcl_ClassCompiledVarResolver2(
     Tcl_Interp *interp,         /* current interpreter */
-    CONST char* name,           /* name of the variable being accessed */
+    const char* name,           /* name of the variable being accessed */
     int length,                 /* number of characters in name */
     Tcl_Namespace *nsPtr,       /* namespace performing the resolution */
     Tcl_ResolvedVarInfo **rPtr) /* returns: info that makes it possible to
@@ -509,7 +508,7 @@ ItclClassRuntimeVarResolver2(
 int
 Itcl_ParseVarResolver2(
     Tcl_Interp *interp,        /* current interpreter */
-    CONST char* name,                /* name of the variable being accessed */
+    const char* name,                /* name of the variable being accessed */
     Tcl_Namespace *contextNs,  /* namespace context */
     int flags,                 /* TCL_GLOBAL_ONLY => global variable
                                 * TCL_NAMESPACE_ONLY => namespace variable */

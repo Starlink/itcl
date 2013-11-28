@@ -12,8 +12,6 @@
  *
  * See the file "license.terms" for information on usage and redistribution of
  * this file, and for a DISCLAIMER OF ALL WARRANTIES.
- *
- * RCS: @(#) $Id: itcl.h,v 1.31.2.9 2009/02/02 15:36:35 wiede Exp $
  */
 
 /*
@@ -57,15 +55,18 @@
 #ifndef ITCL_H_INCLUDED
 #define ITCL_H_INCLUDED
 
-#include <string.h>
-#include <ctype.h>
-#include "tcl.h"
+#include <tcl.h>
 
-#if defined(BUILD_itcl)
-#       define ITCLAPI DLLEXPORT
-#       undef USE_ITCL_STUBS
-#else
-#       define ITCLAPI DLLIMPORT
+#if (TCL_MAJOR_VERSION != 8) || (TCL_MINOR_VERSION < 6)
+#    error Itcl 4 build requires tcl.h from Tcl 8.6 or later
+#endif
+
+/*
+ * For C++ compilers, use extern "C"
+ */
+
+#ifdef __cplusplus
+extern "C" {
 #endif
 
 #ifndef TCL_ALPHA_RELEASE
@@ -80,24 +81,45 @@
 
 #define ITCL_MAJOR_VERSION	4
 #define ITCL_MINOR_VERSION	0
-#define ITCL_RELEASE_LEVEL      TCL_BETA_RELEASE
-#define ITCL_RELEASE_SERIAL     3
+#define ITCL_RELEASE_LEVEL      TCL_FINAL_RELEASE
+#define ITCL_RELEASE_SERIAL     0
 
 #define ITCL_VERSION            "4.0"
-#define ITCL_PATCH_LEVEL        "4.0b3"
+#define ITCL_PATCH_LEVEL        "4.0.0"
+
+
+/*
+ * A special definition used to allow this header file to be included from
+ * windows resource files so that they can obtain version information.
+ * RC_INVOKED is defined by default by the windows RC tool.
+ *
+ * Resource compilers don't like all the C stuff, like typedefs and function
+ * declarations, that occur below, so block them out.
+ */
+
+#ifndef RC_INVOKED
 
 #define ITCL_NAMESPACE          "::itcl"
+
+#ifndef ITCLAPI
+#   if defined(BUILD_itcl)
+#	define ITCLAPI MODULE_SCOPE
+#   else
+#	define ITCLAPI extern
+#	undef USE_ITCL_STUBS
+#	define USE_ITCL_STUBS 1
+#   endif
+#endif
 
 #undef TCL_STORAGE_CLASS
 #ifdef BUILD_itcl
 #   define TCL_STORAGE_CLASS DLLEXPORT
 #else
-#   ifdef USE_ITCL_STUBS
-#       define TCL_STORAGE_CLASS
-#   else
-#       define TCL_STORAGE_CLASS DLLIMPORT
-#   endif
+#   define TCL_STORAGE_CLASS
 #endif
+
+EXTERN int		Itcl_Init(Tcl_Interp *interp);
+EXTERN int		Itcl_SafeInit(Tcl_Interp *interp);
 
 /*
  * Protection levels:
@@ -171,5 +193,15 @@ void ItclDbgReleaseData(ClientData cdata, int line, const char *file);
 
 #undef TCL_STORAGE_CLASS
 #define TCL_STORAGE_CLASS DLLIMPORT
+
+#endif /* RC_INVOKED */
+
+/*
+ * end block for C++
+ */
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* ITCL_H_INCLUDED */

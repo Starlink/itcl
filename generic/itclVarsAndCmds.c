@@ -8,7 +8,6 @@
  * ========================================================================
  *  AUTHOR:  Arnulf Wiedemann
  *
- *     RCS:  $Id: itclVarsAndCmds.c,v 1.1.2.4 2009/01/07 19:38:50 wiede Exp $
  * ========================================================================
  *           Copyright (c) Arnulf Wiedemann
  * ------------------------------------------------------------------------
@@ -16,7 +15,7 @@
  * of this file, and for a DISCLAIMER OF ALL WARRANTIES.
  */
 
-#include "tclInt.h"
+#include <tclInt.h>
 #include "itclInt.h"
 #include "itclVCInt.h"
 
@@ -80,7 +79,7 @@ Itcl_RegisterClassVariable(
 	tablePtr = (Tcl_HashTable *)ckalloc(sizeof(Tcl_HashTable));
 	Tcl_InitHashTable(tablePtr, TCL_STRING_KEYS);
         Tcl_SetHashValue(hPtr, tablePtr);
-        
+
     } else {
         tablePtr = Tcl_GetHashValue(hPtr);
     }
@@ -109,7 +108,7 @@ Itcl_RegisterClassCommand(
 	tablePtr = (Tcl_HashTable *)ckalloc(sizeof(Tcl_HashTable));
 	Tcl_InitHashTable(tablePtr, TCL_STRING_KEYS);
         Tcl_SetHashValue(hPtr, tablePtr);
-        
+
     } else {
         tablePtr = Tcl_GetHashValue(hPtr);
     }

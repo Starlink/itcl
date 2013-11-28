@@ -19,8 +19,6 @@
  *           Bell Labs Innovations for Lucent Technologies
  *           mmclennan@lucent.com
  *           http://www.tcltk.com/itcl
- *
- *     RCS:  $Id: itclResolve.c,v 1.1.2.29 2009/01/14 22:43:24 davygrvy Exp $
  * ========================================================================
  *           Copyright (c) 1993-1998  Lucent Technologies, Inc.
  * ------------------------------------------------------------------------
@@ -38,8 +36,17 @@ typedef struct ItclResolvedVarInfo {
     ItclVarLookup *vlookup;           /* Pointer to lookup info. */
 } ItclResolvedVarInfo;
 
-static Tcl_Var ItclClassRuntimeVarResolver _ANSI_ARGS_((
-    Tcl_Interp *interp, Tcl_ResolvedVarInfo *vinfoPtr));
+static const char * special_resolve_vars[] = {
+   "this",
+   "self",
+   "itk_option",
+   "itk_interior",
+   "itk_component",
+   NULL
+};
+
+static Tcl_Var ItclClassRuntimeVarResolver(
+    Tcl_Interp *interp, Tcl_ResolvedVarInfo *vinfoPtr);
 
 
 /*
@@ -188,7 +195,7 @@ Itcl_ClassCmdResolver(
      *    command, it may not be.  This is just the time to catch
      *    it--as it is being resolved again by the compiler.
      */
-    
+
     /*
      * The following #if is needed so itcl can be compiled with
      * all versions of Tcl.  The integer "deleted" was renamed to
@@ -251,16 +258,30 @@ Itcl_ClassVarResolver(
     Tcl_HashEntry *hPtr;
     ItclVarLookup *vlookup;
     ItclCallContext *callContextPtr;
+    int idx;
+    int start_idx;
+    int found;
+    const char **cp;
 
     Tcl_Namespace *upNsPtr;
     upNsPtr = Itcl_GetUplevelNamespace(interp, 1);
     assert(Itcl_IsClassNamespace(nsPtr));
 
+    contextIoPtr = NULL;
     /*
      *  If this is a global variable, handle it in the usual
      *  Tcl manner.
      */
     if (flags & TCL_GLOBAL_ONLY) {
+        return TCL_CONTINUE;
+    }
+
+    /*
+     *  See if this is a formal parameter in the current proc scope.
+     *  If so, that variable has precedence.
+     */
+    if ((strstr(name,"::") == NULL) &&
+            Itcl_IsCallFrameArgument(interp, name)) {
         return TCL_CONTINUE;
     }
 
@@ -271,19 +292,6 @@ Itcl_ClassVarResolver(
         return TCL_CONTINUE;
     }
     iclsPtr = Tcl_GetHashValue(hPtr);
-
-    /*
-     *  See if this is a formal parameter in the current proc scope.
-     *  If so, that variable has precedence.  Look it up and return
-     *  it here.  This duplicates some of the functionality of
-     *  TclLookupVar, but we return it here (instead of returning
-     *  TCL_CONTINUE) to avoid looking it up again later.
-     */
-    callContextPtr = Itcl_PeekStack(&infoPtr->contextStack);
-    if ((strstr(name,"::") == NULL) &&
-            Itcl_IsCallFrameArgument(interp, name)) {
-        return TCL_CONTINUE;
-    }
 
     /*
      *  See if the variable is a known data member and accessible.
@@ -316,43 +324,84 @@ Itcl_ClassVarResolver(
      *  find the object context,
      */
 
-    if (callContextPtr == NULL) {
-        return TCL_CONTINUE;
-    }
-    if (callContextPtr->ioPtr == NULL) {
-        return TCL_CONTINUE;
-    }
-    contextIoPtr = callContextPtr->ioPtr;
+    idx = Itcl_GetStackSize(&infoPtr->contextStack) - 1;
+    start_idx = idx;
+    while (idx >= 0) {
+	/* self and other special_resolve_vars can only be looked up in
+	 * the current object!! */
+	cp = &special_resolve_vars[0];
+	found = 0;
+	while (*cp != NULL) {
+	    if (strcmp(name, *cp) == 0) {
+		found = 1;
+		break;
+	    }
+	    cp++;
+	}
+	if (found) {
+            if (idx != start_idx) {
+                break;
+	    }
+        }
+        callContextPtr = Itcl_GetStackValue(&infoPtr->contextStack, idx);
+	idx--;
+        /* we first look in the current object, then we look if there is
+	 * perhaps a public variable on the
+	 * stack from another class object
+	 */
+        if (callContextPtr == NULL) {
+            continue;
+        }
+        if (callContextPtr->ioPtr == NULL) {
+            continue;
+        }
+        contextIoPtr = callContextPtr->ioPtr;
 
-    /*
-     *  TRICKY NOTE:  We've resolved the variable in the current
-     *    class context, but we must also be careful to get its
-     *    index from the most-specific class context.  Variables
-     *    are arranged differently depending on which class
-     *    constructed the object.
-     */
-    hPtr = Tcl_FindHashEntry(&infoPtr->objects, (char *)contextIoPtr);
-    if (hPtr == NULL) {
-	return TCL_CONTINUE;
+        /*
+         *  TRICKY NOTE:  We've resolved the variable in the current
+         *    class context, but we must also be careful to get its
+         *    index from the most-specific class context.  Variables
+         *    are arranged differently depending on which class
+         *    constructed the object.
+         */
+        hPtr = Tcl_FindHashEntry(&infoPtr->objects, (char *)contextIoPtr);
+        if (hPtr == NULL) {
+            continue;
 #ifdef NOTDEF
-	char str[20];
-	sprintf(str, "%p", contextIoPtr);
-	Tcl_AppendResult(interp, "contextIoPtr has vanished!!", str, NULL);
-        return TCL_ERROR;
+	    char str[20];
+	    sprintf(str, "%p", contextIoPtr);
+	    Tcl_AppendResult(interp, "contextIoPtr has vanished!!", str, NULL);
+            return TCL_ERROR;
 #endif
-    }
-    if (contextIoPtr->iclsPtr != vlookup->ivPtr->iclsPtr) {
-	if (strcmp(Tcl_GetString(vlookup->ivPtr->namePtr), "this") == 0) {
-            hPtr = Tcl_FindHashEntry(&contextIoPtr->iclsPtr->resolveVars,
-                Tcl_GetString(vlookup->ivPtr->namePtr));
+        }
+        if (contextIoPtr->iclsPtr != vlookup->ivPtr->iclsPtr) {
+	    if (strcmp(Tcl_GetString(vlookup->ivPtr->namePtr), "this") == 0) {
+                hPtr = Tcl_FindHashEntry(&contextIoPtr->iclsPtr->resolveVars,
+                    Tcl_GetString(vlookup->ivPtr->namePtr));
 
-            if (hPtr != NULL) {
-                vlookup = (ItclVarLookup*)Tcl_GetHashValue(hPtr);
+                if (hPtr != NULL) {
+                    vlookup = (ItclVarLookup*)Tcl_GetHashValue(hPtr);
+                }
             }
         }
+        hPtr = Tcl_FindHashEntry(&contextIoPtr->objectVariables,
+                (char *)vlookup->ivPtr);
+	/* check if it is a public variable (must be one) if not top_level */
+//	if ((idx != start_idx) && !(vlookup->ivPtr->protection & ITCL_PUBLIC)) {
+//	    continue;
+//	}
+	if (hPtr != NULL) {
+	    break;
+	}
+	/* self can only be looked up in the current object!! */
+	if (strcmp(name, "self") == 0) {
+	    break;
+	}
     }
-    hPtr = Tcl_FindHashEntry(&contextIoPtr->objectVariables,
-            (char *)vlookup->ivPtr);
+
+    if (hPtr == NULL) {
+        return TCL_CONTINUE;
+    }
     if (strcmp(name, "this") == 0) {
         Tcl_Var varPtr;
         Tcl_DString buffer;
@@ -386,6 +435,7 @@ Itcl_ClassVarResolver(
 	Tcl_DStringAppend(&buffer, Tcl_GetString(contextIoPtr->namePtr), -1);
 	Tcl_DStringAppend(&buffer, "::itcl_options", -1);
 	varPtr = Itcl_FindNamespaceVar(interp, Tcl_DStringValue(&buffer), NULL, 0);
+	Tcl_DStringFree(&buffer);
         if (varPtr != NULL) {
             *rPtr = varPtr;
 	    return TCL_OK;
@@ -447,7 +497,7 @@ Itcl_ClassCompiledVarResolver(
      *  Copy the name to local storage so we can NULL terminate it.
      *  If the name is long, allocate extra space for it.
      */
-    if (length < sizeof(storage)) {
+    if ((unsigned int)length < sizeof(storage)) {
         buffer = storage;
     } else {
         buffer = (char*)ckalloc((unsigned)(length+1));
@@ -597,6 +647,7 @@ ItclClassRuntimeVarResolver(
 	    Tcl_DStringAppend(&buffer, "::itcl_options", -1);
 	    varPtr = Itcl_FindNamespaceVar(interp, Tcl_DStringValue(&buffer),
 	            NULL, 0);
+	    Tcl_DStringFree(&buffer);
             if (varPtr != NULL) {
 	        return varPtr;
             }

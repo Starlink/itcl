@@ -5,8 +5,6 @@
 #            Bell Labs Innovations for Lucent Technologies
 #            mmclennan@lucent.com
 #            http://www.tcltk.com/itcl
-#
-#      RCS:  $Id: info.test,v 1.6.2.6 2009/01/02 22:56:49 dgp Exp $
 # ----------------------------------------------------------------------
 #            Copyright (c) 1993-1998  Lucent Technologies, Inc.
 # ======================================================================
@@ -16,6 +14,7 @@
 package require tcltest 2.2
 namespace import ::tcltest::test
 ::tcltest::loadTestedCommands
+package require itcl
 
 # ----------------------------------------------------------------------
 #  Class definition with one of everything

@@ -23,8 +23,6 @@
  *           http://www.tcltk.com/itcl
  *
  *  overhauled version author: Arnulf Wiedemann Copyright (c) 2007
- *
- *     RCS:  $Id: itclObject.c,v 1.1.2.74 2009/01/24 19:39:43 wiede Exp $
  * ========================================================================
  *           Copyright (c) 1993-1998  Lucent Technologies, Inc.
  * ------------------------------------------------------------------------
@@ -32,16 +30,6 @@
  * of this file, and for a DISCLAIMER OF ALL WARRANTIES.
  */
 #include "itclInt.h"
-
-Tcl_ObjCmdProc Itcl_BiMyTypeMethodCmd;
-Tcl_ObjCmdProc Itcl_BiMyMethodCmd;
-Tcl_ObjCmdProc Itcl_BiMyProcCmd;
-Tcl_ObjCmdProc Itcl_BiMyTypeVarCmd;
-Tcl_ObjCmdProc Itcl_BiMyVarCmd;
-Tcl_ObjCmdProc Itcl_BiItclHullCmd;
-Tcl_ObjCmdProc Itcl_BiCallInstanceCmd;
-Tcl_ObjCmdProc Itcl_BiGetInstanceVarCmd;
-Tcl_ObjCmdProc Itcl_BiInstallComponentCmd;
 
 /*
  *  FORWARD DECLARATIONS
@@ -67,7 +55,9 @@ static int ItclInitObjectCommands(Tcl_Interp *interp, ItclObject *ioPtr,
         ItclClass *iclsPtr, const char *name);
 static int ItclInitExtendedClassOptions(Tcl_Interp *interp, ItclObject *ioPtr);
 static int ItclInitObjectOptions(Tcl_Interp *interp, ItclObject *ioPtr,
-         ItclClass *iclsPtr, const char *name);
+        ItclClass *iclsPtr, const char *name);
+static const char * GetConstructorVar(Tcl_Interp *interp, ItclClass *iclsPtr,
+        const char *varName);
 
 
 /*
@@ -152,7 +142,7 @@ ItclCreateObject(
     const char* name,        /* name of new object */
     ItclClass *iclsPtr,        /* class for new object */
     int objc,                /* number of arguments */
-    Tcl_Obj *CONST objv[])   /* argument objects */
+    Tcl_Obj *const objv[])   /* argument objects */
 {
     int result = TCL_OK;
 
@@ -341,7 +331,7 @@ ItclCreateObject(
 	    Tcl_CmdInfo dummy;
 
             sprintf(unique,"%.200s_%d", name, iclsPtr->unique++);
-            unique[0] = tolower(unique[0]);
+            unique[0] = tolower(UCHAR(unique[0]));
 
             Tcl_DStringTrunc(&buffer, 0);
             Tcl_DStringAppend(&buffer, unique, -1);
@@ -424,8 +414,13 @@ ItclCreateObject(
      *  invoked implicitly without arguments.
      */
     ItclShowArgs(1, "OBJECTCONSTRUCTOR", objc, objv);
+    ioPtr->hadConstructorError = 0;
     result = Itcl_InvokeMethodIfExists(interp, "constructor",
         iclsPtr, ioPtr, objc, objv);
+    if (ioPtr->hadConstructorError) {
+        result = TCL_ERROR;
+    }
+    ioPtr->hadConstructorError = -1;
     if (result != TCL_OK) {
         int constructorStackSize;
 	/* clean up the constructor stack */
@@ -462,6 +457,15 @@ ItclCreateObject(
     }
     Tcl_DecrRefCount(objPtr);
 
+    if (iclsPtr->flags & ITCL_ECLASS) {
+        ItclInitExtendedClassOptions(interp, ioPtr);
+        if (ItclInitObjectOptions(interp, ioPtr, iclsPtr, name) != TCL_OK) {
+                Tcl_AppendResult(interp, "error in ItclInitObjectOptions",
+	        NULL);
+            result = TCL_ERROR;
+            goto errorReturn;
+        }
+    }
     /*
      *  If construction failed, then delete the object access
      *  command.  This will destruct the object and delete the
@@ -1166,7 +1170,8 @@ ItclInitObjectOptions(
  *  when an object is created.
  * ------------------------------------------------------------------------
  */
-int
+#if 0
+static int
 ItclInitObjectComponents(
    Tcl_Interp *interp,
    ItclObject *ioPtr,
@@ -1236,6 +1241,7 @@ ItclInitObjectComponents(
     Itcl_DeleteHierIter(&hier);
     return TCL_OK;
 }
+#endif
 
 /*
  * ------------------------------------------------------------------------
@@ -1243,7 +1249,7 @@ ItclInitObjectComponents(
  *
  *  Collect all instance methdovariables for the given object instance to allow
  *  faster runtime access to the methdovariables.
- *  This is usually invoked *  automatically by Itcl_CreateObject(),
+ *  This is usually invoked automatically by Itcl_CreateObject(),
  *  when an object is created.
  * ------------------------------------------------------------------------
  */
@@ -1478,9 +1484,9 @@ Itcl_DestructObject(
          *  If all goes well, return the null string as the result.
          */
         callbackPtr = Itcl_GetCurrentCallbackPtr(interp);
-        Itcl_NRAddCallback(interp, FinalizeDeleteObject, contextIoPtr,
+        Tcl_NRAddCallback(interp, FinalizeDeleteObject, contextIoPtr,
 	        NULL, NULL, NULL);
-        Itcl_NRAddCallback(interp, CallDestructBase, contextIoPtr,
+        Tcl_NRAddCallback(interp, CallDestructBase, contextIoPtr,
 	        INT2PTR(flags), NULL, NULL);
         result = Itcl_NRRunCallbacks(interp, callbackPtr);
     }
@@ -1523,7 +1529,7 @@ ItclDestructBase(
     if (Tcl_FindHashEntry(contextIoPtr->destructed,
             (char *)contextIclsPtr->namePtr) == NULL) {
         result = Itcl_InvokeMethodIfExists(interp, "destructor",
-            contextIclsPtr, contextIoPtr, 0, (Tcl_Obj* CONST*)NULL);
+            contextIclsPtr, contextIoPtr, 0, (Tcl_Obj* const*)NULL);
         if (result != TCL_OK) {
             return TCL_ERROR;
         }
@@ -1568,7 +1574,7 @@ ItclDestructBase(
 int
 Itcl_FindObject(
     Tcl_Interp *interp,      /* interpreter containing this object */
-    CONST char *name,        /* name of the object */
+    const char *name,        /* name of the object */
     ItclObject **roPtr)      /* returns: object data or NULL */
 {
     Tcl_Command cmd;
@@ -1664,6 +1670,10 @@ Itcl_ObjectIsa(
     ItclClass *iclsPtr)       /* class to test for "is-a" relationship */
 {
     Tcl_HashEntry *entry;
+
+    if (contextIoPtr == NULL) {
+        return 0;
+    }
     entry = Tcl_FindHashEntry(&contextIoPtr->iclsPtr->heritage, (char*)iclsPtr);
     return (entry != NULL);
 }
@@ -1681,7 +1691,7 @@ Itcl_ObjectIsa(
  *  anything goes wrong, this returns NULL.
  * ------------------------------------------------------------------------
  */
-CONST char*
+const char*
 ItclGetInstanceVar(
     Tcl_Interp *interp,        /* current interpreter */
     const char *name1,         /* name of desired instance variable */
@@ -1783,7 +1793,7 @@ ItclGetInstanceVar(
  *  anything goes wrong, this returns NULL.
  * ------------------------------------------------------------------------
  */
-CONST char*
+const char*
 ItclGetCommonInstanceVar(
     Tcl_Interp *interp,        /* current interpreter */
     const char *name1,         /* name of desired instance variable */
@@ -1795,7 +1805,7 @@ ItclGetCommonInstanceVar(
     Tcl_CallFrame *framePtr;
     Tcl_Namespace *nsPtr;
     Tcl_DString buffer;
-    CONST char *val;
+    const char *val;
     int doAppend;
 
     /*
@@ -1854,7 +1864,7 @@ ItclGetCommonInstanceVar(
  *  anything goes wrong, this returns NULL.
  * ------------------------------------------------------------------------
  */
-CONST char*
+const char*
 Itcl_GetInstanceVar(
     Tcl_Interp *interp,        /* current interpreter */
     const char *name,          /* name of desired instance variable */
@@ -1878,7 +1888,7 @@ Itcl_GetInstanceVar(
  *  anything goes wrong, this returns NULL.
  * ------------------------------------------------------------------------
  */
-CONST char*
+const char*
 ItclSetInstanceVar(
     Tcl_Interp *interp,        /* current interpreter */
     const char *name1,         /* name of desired instance variable */
@@ -2577,9 +2587,6 @@ ItclFreeObject(
  * ------------------------------------------------------------------------
  */
 
-int Itcl_InvokeProcedureMethod(ClientData clientData, Tcl_Interp *interp,
-	int objc, Tcl_Obj *const *objv);
-
 static int
 CallPublicObjectCmd(
     ClientData data[],
@@ -2616,9 +2623,9 @@ ItclObjectCmd(
     Itcl_ListElem *elem;
     ItclClass *basePtr;
     void *callbackPtr;
-    char *className;
-    char *tail;
-    char *cp;
+    const char *className;
+    const char *tail;
+    const char *cp;
     int isDirectCall;
     int incr;
     int result;
@@ -2765,12 +2772,12 @@ ItclObjectCmd(
         newObjv[1] = methodNamePtr;
         memcpy(newObjv+incr+1, objv+1, (sizeof(Tcl_Obj*)*(objc-1)));
 	ItclShowArgs(1, "run CallPublicObjectCmd1", objc+incr, newObjv);
-        Itcl_NRAddCallback(interp, CallPublicObjectCmd, oPtr, clsPtr,
+	Tcl_NRAddCallback(interp, CallPublicObjectCmd, oPtr, clsPtr,
 	        INT2PTR(objc+incr), newObjv);
 
     } else {
 	ItclShowArgs(1, "run CallPublicObjectCmd2", objc, objv);
-        Itcl_NRAddCallback(interp, CallPublicObjectCmd, oPtr, clsPtr,
+	Tcl_NRAddCallback(interp, CallPublicObjectCmd, oPtr, clsPtr,
 	        INT2PTR(objc), (ClientData)objv);
     }
 
@@ -2831,13 +2838,15 @@ ItclObjectUnknownCommand(
  * ------------------------------------------------------------------------
  */
 
-static ItclClass *
+ItclClass *
 GetClassFromClassName(
+    Tcl_Interp *interp,
     const char *className,
     ItclClass *iclsPtr)
 {
     Tcl_Obj *objPtr;
     Tcl_HashEntry *hPtr;
+    ItclObjectInfo *infoPtr;
     ItclClass *basePtr;
     Itcl_ListElem *elem;
     const char *chkPtr;
@@ -2846,38 +2855,44 @@ GetClassFromClassName(
 
     /* look for the class in the hierarchy */
     /* first check the class itself */
-    if (strcmp(className,
-            (const char *)Tcl_GetString(iclsPtr->namePtr)) == 0) {
-	return iclsPtr;
-    }
-    elem = Itcl_FirstListElem(&iclsPtr->bases);
-    while (elem != NULL) {
-        basePtr = (ItclClass*)Itcl_GetListValue(elem);
-	basePtr = GetClassFromClassName(className, basePtr);
-	if (basePtr != NULL) {
-	    return basePtr;
+    if (iclsPtr != NULL) {
+        if (strcmp(className,
+                (const char *)Tcl_GetString(iclsPtr->namePtr)) == 0) {
+	    return iclsPtr;
 	}
-        elem = Itcl_NextListElem(elem);
-    }
-    /* now try to match the classes full name last part with the className */
-    lgth = strlen(className);
-    elem = Itcl_FirstListElem(&iclsPtr->bases);
-    while (elem != NULL) {
-        basePtr = (ItclClass*)Itcl_GetListValue(elem);
-	chkPtr = basePtr->nsPtr->fullName;
-	chkLgth = strlen(chkPtr);
-	if (chkLgth >= lgth) {
-	    chkPtr = chkPtr + chkLgth - lgth;
-	    if (strcmp(chkPtr, className) == 0) {
+        elem = Itcl_FirstListElem(&iclsPtr->bases);
+        while (elem != NULL) {
+            basePtr = (ItclClass*)Itcl_GetListValue(elem);
+	    basePtr = GetClassFromClassName(interp, className, basePtr);
+	    if (basePtr != NULL) {
 	        return basePtr;
 	    }
-	}
-        elem = Itcl_NextListElem(elem);
+            elem = Itcl_NextListElem(elem);
+        }
+        /* now try to match the classes full name last part with the className */
+        lgth = strlen(className);
+        elem = Itcl_FirstListElem(&iclsPtr->bases);
+        while (elem != NULL) {
+            basePtr = (ItclClass*)Itcl_GetListValue(elem);
+	    chkPtr = basePtr->nsPtr->fullName;
+	    chkLgth = strlen(chkPtr);
+	    if (chkLgth >= lgth) {
+	        chkPtr = chkPtr + chkLgth - lgth;
+	        if (strcmp(chkPtr, className) == 0) {
+	            return basePtr;
+	        }
+	    }
+            elem = Itcl_NextListElem(elem);
+        }
+        infoPtr = iclsPtr->infoPtr;
+    } else {
+        infoPtr = (ItclObjectInfo *)Tcl_GetAssocData(interp,
+                ITCL_INTERP_DATA, NULL);
     }
     /* as a last chance try with className in hash table */
     objPtr = Tcl_NewStringObj(className, -1);
     Tcl_IncrRefCount(objPtr);
-    hPtr = Tcl_FindHashEntry(&iclsPtr->infoPtr->nameClasses, (char *)objPtr);
+    hPtr = Tcl_FindHashEntry(&infoPtr->nameClasses, (char *)objPtr);
     if (hPtr != NULL) {
         iclsPtr = Tcl_GetHashValue(hPtr);
     } else {
@@ -2908,9 +2923,9 @@ ItclMapMethodNameProc(
     ItclClass *iclsPtr;
     ItclClass *iclsPtr2;
     ItclObjectInfo *infoPtr;
-    char *head;
-    char *tail;
-    char *sp;
+    const char *head;
+    const char *tail;
+    const char *sp;
 
     iclsPtr = NULL;
     iclsPtr2 = NULL;
@@ -2949,7 +2964,11 @@ ItclMapMethodNameProc(
         Tcl_IncrRefCount(methodName);
         className = Tcl_NewStringObj(head, -1);
         Tcl_IncrRefCount(className);
-	iclsPtr2 = GetClassFromClassName(head, iclsPtr);
+	if (strlen(head) > 0) {
+	    iclsPtr2 = GetClassFromClassName(interp, head, iclsPtr);
+	} else {
+	    iclsPtr2 = NULL;
+	}
 	if (iclsPtr2 != NULL) {
 	    *startClsPtr = iclsPtr2->clsPtr;
 	    Tcl_SetStringObj(methodObj, Tcl_GetString(methodName), -1);
@@ -2958,7 +2977,16 @@ ItclMapMethodNameProc(
         Tcl_DecrRefCount(methodName);
     }
     hPtr = Tcl_FindHashEntry(&iclsPtr->resolveCmds, (char *)methodObj);
-    if (hPtr != NULL) {
+    if (hPtr == NULL) {
+        /* special case: we found the class for the class command,
+	 * for a relative or absolute class path name
+	 * but we have no method in that class that fits.
+	 * Problem of Rene Zaumseil when having the object
+	 * for a class in a child namespace of the class
+	 * fossil ticket id: 36577626c340ad59615f0a0238d67872c009a8c9
+	 */
+        *startClsPtr = NULL;
+    } else {
 	ItclMemberFunc *imPtr;
 	Tcl_Namespace *nsPtr;
 	ItclCmdLookup *clookup;
@@ -3003,6 +3031,7 @@ ItclMapMethodNameProc(
     Tcl_DStringFree(&buffer);
     return TCL_OK;
 }
+
 int
 ExpandDelegateAs(
     Tcl_Interp *interp,
@@ -3133,6 +3162,40 @@ ExpandDelegateAs(
 			    }
 		        }
 		        break;
+		    case ':':
+		        /* substitute with contents of variable after ':' */
+			if (iclsPtr->flags & ITCL_ECLASS) {
+			    if (ep-cp-1 > 0) {
+		                Tcl_ListObjAppendElement(interp, listPtr,
+			                Tcl_NewStringObj(cp, ep-cp-1));
+			    }
+			    ep++;
+			    cp = ep + 1;
+			    while (*ep && (*ep != ' ')) {
+			        ep++;
+			    }
+			    if (ep-cp > 0) {
+				Tcl_Obj *my_obj;
+				const char *cp2;
+
+                                my_obj = Tcl_NewStringObj(cp, ep-cp);
+				if (iclsPtr->infoPtr->currIoPtr != NULL) {
+				  cp2 = GetConstructorVar(interp, iclsPtr,
+				      Tcl_GetString(my_obj));
+				} else {
+                                  cp2 = ItclGetInstanceVar(interp,
+                                      Tcl_GetString(my_obj), NULL, ioPtr,
+				      iclsPtr);
+				}
+				if (cp2 != NULL) {
+                                    Tcl_AppendToObj(strPtr, cp2, -1);
+				}
+			        ep -= 2; /* to fit for code after default !! */
+			    }
+		            break;
+		        } else {
+			    /* fall through */
+			}
 		    default:
 		      {
 			char buf[2];
@@ -3291,6 +3354,62 @@ DelegatedOptionsInstall(
 
 /*
  * ------------------------------------------------------------------------
+ *  GetConstructorVar()
+ *  get an object variable when in executing the constructor
+ * ------------------------------------------------------------------------
+ */
+
+static const char *
+GetConstructorVar(
+    Tcl_Interp *interp,
+    ItclClass *iclsPtr,
+    const char *varName)
+
+{
+    Tcl_HashEntry *hPtr;
+    Tcl_Obj *objPtr;
+    Tcl_DString buffer;
+    ItclVarLookup *vlookup;
+    ItclVariable *ivPtr;
+    const char *val;
+
+    hPtr = Tcl_FindHashEntry(&iclsPtr->resolveVars, (char *)varName);
+    if (hPtr == NULL) {
+	/* no such variable */
+        return NULL;
+    }
+    vlookup = (ItclVarLookup *)Tcl_GetHashValue(hPtr);
+    if (vlookup == NULL) {
+        return NULL;
+    }
+    ivPtr = vlookup->ivPtr;
+    if (ivPtr == NULL) {
+        return NULL;
+    }
+    if (ivPtr->flags & ITCL_COMMON) {
+        /* look for a common variable */
+        objPtr = Tcl_NewStringObj(ITCL_VARIABLES_NAMESPACE, -1);
+        Tcl_AppendToObj(objPtr, iclsPtr->nsPtr->fullName, -1);
+        Tcl_AppendToObj(objPtr, "::", -1);
+        Tcl_AppendToObj(objPtr, varName, -1);
+        val = Tcl_GetVar2(interp, Tcl_GetString(objPtr), NULL, 0);
+        Tcl_DecrRefCount(objPtr);
+    } else {
+        /* look for a normal variable */
+        Tcl_DStringInit(&buffer);
+        Tcl_DStringAppend(&buffer,
+                Tcl_GetString(iclsPtr->infoPtr->currIoPtr->varNsNamePtr), -1);
+        Tcl_DStringAppend(&buffer, ivPtr->iclsPtr->nsPtr->fullName, -1);
+        Tcl_DStringAppend(&buffer, "::", -1);
+        Tcl_DStringAppend(&buffer, varName, -1);
+        val = Tcl_GetVar2(interp, Tcl_DStringValue(&buffer), NULL, 0);
+        Tcl_DStringFree(&buffer);
+    }
+    return val;
+}
+
+/*
+ * ------------------------------------------------------------------------
  *  DelegationInstall()
  * ------------------------------------------------------------------------
  */
@@ -3307,6 +3426,7 @@ DelegationInstall(
     Tcl_DString buffer;
     ItclDelegatedFunction *idmPtr;
     ItclMemberFunc *imPtr;
+    ItclVariable *ivPtr;
     FOREACH_HASH_DECLS;
     char *methodName;
     const char *val;
@@ -3329,10 +3449,10 @@ DelegationInstall(
 	    /* we cannot use Itcl_GetInstanceVar here as the object is not
 	     * yet completely built. So use the varNsNamePtr
 	     */
-            if (idmPtr->icPtr->ivPtr->flags & ITCL_COMMON) {
+	    ivPtr = idmPtr->icPtr->ivPtr;
+            if (ivPtr->flags & ITCL_COMMON) {
 	        objPtr = Tcl_NewStringObj(ITCL_VARIABLES_NAMESPACE, -1);
-	        Tcl_AppendToObj(objPtr,
-		        idmPtr->icPtr->ivPtr->iclsPtr->nsPtr->fullName, -1);
+	        Tcl_AppendToObj(objPtr, ivPtr->iclsPtr->nsPtr->fullName, -1);
 	        Tcl_AppendToObj(objPtr, "::", -1);
 	        Tcl_AppendToObj(objPtr,
 		        Tcl_GetString(idmPtr->icPtr->namePtr), -1);
@@ -3343,9 +3463,10 @@ DelegationInstall(
                 Tcl_DStringAppend(&buffer,
                         Tcl_GetString(ioPtr->varNsNamePtr), -1);
                 Tcl_DStringAppend(&buffer,
-                        Tcl_GetString(idmPtr->icPtr->ivPtr->fullNamePtr), -1);
+                        Tcl_GetString(ivPtr->fullNamePtr), -1);
                 val = Tcl_GetVar2(interp,
                             Tcl_DStringValue(&buffer), NULL, 0);
+                Tcl_DStringFree(&buffer);
 	    }
 	    componentValuePtr = Tcl_NewStringObj(val, -1);
             Tcl_IncrRefCount(componentValuePtr);

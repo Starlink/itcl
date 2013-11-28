@@ -8,18 +8,14 @@
  *
  * See the file "license.terms" for information on usage and redistribution of
  * this file, and for a DISCLAIMER OF ALL WARRANTIES.
- *
- * RCS: @(#) $Id: itclInt.h,v 1.17.2.63 2009/01/24 19:48:02 wiede Exp $
  */
 
-#include <string.h>
-#include <ctype.h>
-#include <tcl.h>
-#include <tclOO.h>
-#include "itclMigrate2TclCore.h"
-#include "itclTclIntStubsFcn.h"
-#include "itclNeededFromTclOO.h"
-#include "itcl.h"
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif
+#ifdef HAVE_STDINT_H
+#include <stdint.h>
+#endif
 
 /*
  * Used to tag functions that are only to be visible within the module being
@@ -33,6 +29,13 @@
 #       define MODULE_SCOPE extern
 #   endif
 #endif
+
+#include <string.h>
+#include <ctype.h>
+#include <tclOO.h>
+#include "itcl.h"
+#include "itclMigrate2TclCore.h"
+#include "itclTclIntStubsFcn.h"
 
 /*
  * Since the Tcl/Tk distribution doesn't perform any asserts,
@@ -126,7 +129,7 @@ struct ItclDelegatedFunction;
 
 typedef struct ItclObjectInfo {
     Tcl_Interp *interp;             /* interpreter that manages this info */
-    Tcl_HashTable objects;          /* list of all known objects key is 
+    Tcl_HashTable objects;          /* list of all known objects key is
                                      * ioPtr */
     Tcl_HashTable objectCmds;       /* list of known objects using accessCmd */
     Tcl_HashTable objectNames;      /* list of known objects using namePtr */
@@ -165,7 +168,7 @@ typedef struct ItclObjectInfo {
                                      * handling */
     int currClassFlags;             /* flags for the class just in creation */
     int buildingWidget;             /* set if in construction of a widget */
-    int unparsedObjc;               /* number options not parsed by 
+    int unparsedObjc;               /* number options not parsed by
                                        ItclExtendedConfigure/-Cget function */
     Tcl_Obj **unparsedObjv;         /* options not parsed by
                                        ItclExtendedConfigure/-Cget function */
@@ -371,6 +374,7 @@ typedef struct ItclObject {
                                    * to avoid callin destructor twice */
     int noComponentTrace;         /* don't call component traces if
                                    * setting components in DelegationInstall */
+    int hadConstructorError;      /* needed for multiple calls of CallItclObjectCmd */
 } ItclObject;
 
 #define ITCL_IGNORE_ERRS  0x002  /* useful for construction/destruction */
@@ -516,7 +520,7 @@ typedef struct ItclVariable {
     Tcl_Obj *arrayInitPtr;      /* initial value if variable should be array */
     int protection;             /* protection level */
     int flags;                  /* flags describing member (see below) */
-    int initted;                /* is set when first time initted, to check 
+    int initted;                /* is set when first time initted, to check
                                  * for example itcl_hull var, which can be only
 				 * initialized once */
 } ItclVariable;
@@ -641,6 +645,13 @@ typedef struct ItclCallContext {
 } ItclCallContext;
 
 /*
+ * The macro below is used to modify a "char" value (e.g. by casting
+ * it to an unsigned character) so that it can be used safely with
+ * macros such as isspace.
+ */
+
+#define UCHAR(c) ((unsigned char) (c))
+/*
  * Macros used to cast between pointers and integers (e.g. when storing an int
  * in ClientData), on 64-bit architectures they avoid gcc warning about "cast
  * to/from pointer from/to integer of different size".
@@ -661,7 +672,7 @@ MODULE_SCOPE int _itcl_debug_level;
 MODULE_SCOPE void ItclShowArgs(int level, const char *str, int objc,
 	Tcl_Obj * const* objv);
 #else
-#define ItclShowArgs(a,b,c,d) 
+#define ItclShowArgs(a,b,c,d)
 #endif
 
 MODULE_SCOPE Tcl_ObjCmdProc ItclCallCCommand;
@@ -739,10 +750,6 @@ MODULE_SCOPE const char* ItclSetInstanceVar(Tcl_Interp *interp,
         const char *name, const char *name2, const char *value,
 	ItclObject *contextIoPtr, ItclClass *contextIclsPtr);
 MODULE_SCOPE Tcl_Obj * ItclCapitalize(const char *str);
-MODULE_SCOPE int ItclExtendedConfigure(ClientData clientData,
-        Tcl_Interp *interp, int objc, Tcl_Obj *const objv[]);
-MODULE_SCOPE int ItclExtendedCget(ClientData clientData, Tcl_Interp *interp,
-        int objc, Tcl_Obj *const objv[]);
 MODULE_SCOPE int ItclCreateMethod(Tcl_Interp* interp, ItclClass *iclsPtr,
 	Tcl_Obj *namePtr, const char* arglist, const char* body,
         ItclMemberFunc **imPtrPtr);
@@ -809,11 +816,31 @@ MODULE_SCOPE int ItclAddClassFunctionDictInfo(Tcl_Interp *interp,
         ItclClass *iclsPtr, ItclMemberFunc *imPtr);
 MODULE_SCOPE int ItclAddClassDelegatedFunctionDictInfo(Tcl_Interp *interp,
         ItclClass *iclsPtr, ItclDelegatedFunction *idmPtr);
-
-
+MODULE_SCOPE ItclClass * GetClassFromClassName(Tcl_Interp *interp,
+        const char *className, ItclClass *iclsPtr);
+MODULE_SCOPE Tcl_ObjCmdProc Itcl_BiMyProcCmd;
+MODULE_SCOPE Tcl_ObjCmdProc Itcl_BiInstallComponentCmd;
+MODULE_SCOPE Tcl_ObjCmdProc Itcl_BiCallInstanceCmd;
+MODULE_SCOPE Tcl_ObjCmdProc Itcl_BiGetInstanceVarCmd;
+MODULE_SCOPE Tcl_ObjCmdProc Itcl_BiMyTypeMethodCmd;
+MODULE_SCOPE Tcl_ObjCmdProc Itcl_BiMyMethodCmd;
+MODULE_SCOPE Tcl_ObjCmdProc Itcl_BiMyTypeVarCmd;
+MODULE_SCOPE Tcl_ObjCmdProc Itcl_BiMyVarCmd;
+MODULE_SCOPE Tcl_ObjCmdProc Itcl_BiItclHullCmd;
+MODULE_SCOPE Tcl_ObjCmdProc Itcl_ThisCmd;
+MODULE_SCOPE Tcl_ObjCmdProc Itcl_ExtendedClassCmd;
+MODULE_SCOPE Tcl_ObjCmdProc Itcl_TypeClassCmd;
+MODULE_SCOPE Tcl_ObjCmdProc Itcl_AddObjectOptionCmd;
+MODULE_SCOPE Tcl_ObjCmdProc Itcl_AddDelegatedOptionCmd;
+MODULE_SCOPE Tcl_ObjCmdProc Itcl_AddDelegatedFunctionCmd;
+MODULE_SCOPE Tcl_ObjCmdProc Itcl_SetComponentCmd;
+MODULE_SCOPE Tcl_ObjCmdProc Itcl_ClassHullTypeCmd;
+MODULE_SCOPE Tcl_ObjCmdProc Itcl_ClassWidgetClassCmd;
 
 #include "itcl2TclOO.h"
+#ifdef NEW_PROTO_RESOLVER
 #include "itclVarsAndCmds.h"
+#endif
 
 /*
  * Include all the private API, generated from itcl.decls.

@@ -3,8 +3,6 @@
 # ----------------------------------------------------------------------
 #   AUTHOR:  Wolfgang Groﬂer, Arnulf Wiedemann
 #            wolfgang@grosser-erding.de, arnulf@wiedemann-pri.de
-#
-#      RCS:  $Id: general1.test,v 1.1.2.4 2009/01/02 19:12:12 dgp Exp $
 # ----------------------------------------------------------------------
 #            Copyright (c) Wolfgang Groﬂer, Arnulf Wiedemann
 # ======================================================================
@@ -14,6 +12,7 @@
 package require tcltest 2.1
 namespace import ::tcltest::test
 ::tcltest::loadTestedCommands
+package require itcl
 
 # ----------------------------------------------------------------------
 #  Test protection with inheritance

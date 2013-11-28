@@ -1,20 +1,15 @@
 /*
- * $Id: itclStubLib.c,v 1.9.2.7 2009/01/15 05:55:47 davygrvy Exp $
  * SOURCE: tk/generic/tkStubLib.c, version 1.9 2004/03/17
  */
 
-#include "tcl.h"
-
+#define USE_TCL_STUBS 1
 #define USE_ITCL_STUBS 1
-#include "itcl.h"
 #include "itclInt.h"
 
-#ifdef Itcl_InitStubs
 #undef Itcl_InitStubs
-#endif
 
-const ItclStubs *itclStubsPtr;
-const ItclIntStubs *itclIntStubsPtr;
+const ItclStubs *itclStubsPtr = NULL;
+const ItclIntStubs *itclIntStubsPtr = NULL;
 
 /*
  *----------------------------------------------------------------------
@@ -41,23 +36,18 @@ Itcl_InitStubs(
     const char *packageName = "itcl";
     const char *errMsg = NULL;
     ClientData clientData = NULL;
-    ItclStubs *stubsPtr;
-    ItclIntStubs *intStubsPtr;
+    const ItclStubs *stubsPtr;
+    const ItclIntStubs *intStubsPtr;
     const char *actualVersion;
-    struct ItclStubAPI *stubsAPIPtr;
     
     actualVersion =
 	    Tcl_PkgRequireEx(interp, packageName, version, exact, &clientData);
-    stubsAPIPtr = clientData;
-    if (clientData == NULL) {
+    stubsPtr = clientData;
+    if ((actualVersion == NULL) || (clientData == NULL)) {
         return NULL;
     }
-    stubsPtr = stubsAPIPtr->stubsPtr;
-    intStubsPtr = stubsAPIPtr->intStubsPtr;
-
-    if (actualVersion == NULL) {
-	return NULL;
-    }
+    intStubsPtr = stubsPtr->hooks ?
+	    stubsPtr->hooks->itclIntStubs : NULL;
 
     if (!stubsPtr || !intStubsPtr) {
 	errMsg = "missing stub table pointer";

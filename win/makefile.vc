@@ -5,15 +5,13 @@
 # of this file, and for a DISCLAIMER OF ALL WARRANTIES.
 # 
 # Copyright (c) 1993-1998 Lucent Technologies, Inc.
-# RCS: $Id: makefile.vc,v 1.34.2.5 2009/01/15 21:23:49 davygrvy Exp $
 #------------------------------------------------------------------------------
 #  There is no requirement to modify this file to generate a build.
 #------------------------------------------------------------------------------
 
-# Check to see we are configured to build with MSVC (MSDEVDIR or MSVCDIR)
-# or with the MS Platform SDK (MSSDK). Visual Studio .NET 2003 and 2005 define
-# VCINSTALLDIR instead.
-!if !defined(MSDEVDIR) && !defined(MSVCDIR) && !defined(MSSDK) && !defined(VCINSTALLDIR)
+# Check to see we are configured to build with MSVC (MSDEVDIR, MSVCDIR or
+# VCINSTALLDIR) or with the MS Platform SDK (MSSDK or WindowsSDKDir)
+!if !defined(MSDEVDIR) && !defined(MSVCDIR) && !defined(VCINSTALLDIR) && !defined(MSSDK) && !defined(WINDOWSSDKDIR)
 MSG = ^
 You need to run vcvars32.bat from Developer Studio or setenv.bat from the^
 Platform SDK first to setup the environment.  Jump to this line to read^
@@ -57,7 +55,7 @@ PROJECT	= itcl
 BINROOT		= .
 ROOT		= ..
 STUBPREFIX	= $(PROJECT)stub
-DOTVERSION      = $(ITCL_MAJOR_VERSION).$(ITCL_MINOR_VERSION)
+DOTVERSION      = $(ITCL_PATCH_LEVEL)
 VERSION         = $(ITCL_MAJOR_VERSION)$(ITCL_MINOR_VERSION)
 
 PKGINDEX	= "$(TMP_DIR)\pkgIndex.tcl"
@@ -67,11 +65,11 @@ ITCLIMPLIB	= "$(OUT_DIR)\$(PROJECT)$(VERSION)$(SUFX).lib"
 ITCLSTUBLIBNAME	= $(STUBPREFIX)$(VERSION).lib
 ITCLSTUBLIB	= "$(OUT_DIR)\$(ITCLSTUBLIBNAME)"
 
-BIN_INSTALL_DIR		= $(_INSTALLDIR)\bin
-DOC_INSTALL_DIR		= $(_INSTALLDIR)\doc
-LIB_INSTALL_DIR		= $(_INSTALLDIR)\lib
-SCRIPT_INSTALL_DIR	= $(_INSTALLDIR)\lib\$(PROJECT)$(DOTVERSION)
-INCLUDE_INSTALL_DIR	= $(_INSTALLDIR)\include
+BIN_INSTALL_DIR		= $(_INSTALLDIR)\..\bin
+DOC_INSTALL_DIR		= $(_INSTALLDIR)\..\doc
+LIB_INSTALL_DIR		= $(_INSTALLDIR)
+SCRIPT_INSTALL_DIR	= $(_INSTALLDIR)\$(PROJECT)$(DOTVERSION)
+INCLUDE_INSTALL_DIR	= $(_INSTALLDIR)\..\include
 
 ITCLOBJS = \
         $(TMP_DIR)\itcl2TclOO.obj \
@@ -85,7 +83,6 @@ ITCLOBJS = \
         $(TMP_DIR)\itclLinkage.obj \
         $(TMP_DIR)\itclMethod.obj \
         $(TMP_DIR)\itclMigrate2TclCore.obj \
-        $(TMP_DIR)\itclNeededFromTclOO.obj \
         $(TMP_DIR)\itclObject.obj \
         $(TMP_DIR)\itclParse.obj \
         $(TMP_DIR)\itclResolve.obj \
@@ -180,7 +177,7 @@ ldebug	= -release -opt:ref -opt:icf,3
 !endif
 
 # declarations common to all linker options
-lflags	= -nologo -machine:$(MACHINE) $(LINKERFLAGS) $(ldebug) 
+lflags	= -nologo -machine:$(MACHINE) $(LINKERFLAGS) $(ldebug)
 
 !if $(PROFILE)
 lflags	= $(lflags) -profile
@@ -271,14 +268,14 @@ install-binaries :
 		> "$(SCRIPT_INSTALL_DIR)\pkgIndex.tcl"
 	echo ^ ^ ^ ^ set add 80>> "$(SCRIPT_INSTALL_DIR)\pkgIndex.tcl"
 	echo } else {>> "$(SCRIPT_INSTALL_DIR)\pkgIndex.tcl"
-	echo ^ ^ ^ ^ set add {}>> "$(SCRIPT_INSTALL_DIR)\pkgIndex.tcl"
+	echo ^ ^ ^ ^ set add {$(SUFX:g=)}>> "$(SCRIPT_INSTALL_DIR)\pkgIndex.tcl"
 	echo }>> "$(SCRIPT_INSTALL_DIR)\pkgIndex.tcl"
 	echo if {[info exists ::tcl_platform(debug)] ^&^&\
 		$$::tcl_platform(debug)	^&^& \>> "$(SCRIPT_INSTALL_DIR)\pkgIndex.tcl"
 	echo ^ ^ ^ ^ ^ ^ ^ ^ [file exists [file join $$dir\
 		$(PROJECT)$(VERSION)$${add}g.dll]]}\
 		{>> "$(SCRIPT_INSTALL_DIR)\pkgIndex.tcl"
-	echo ^ ^ ^ ^ package ifneeded Itcl $(VERSION) [list load\
+	echo ^ ^ ^ ^ package ifneeded Itcl $(DOTVERSION) [list load\
 		[file join $$dir $(PROJECT)$(VERSION)$${add}g.dll]\
 		Itcl]>> "$(SCRIPT_INSTALL_DIR)\pkgIndex.tcl"
 	echo } else {>> "$(SCRIPT_INSTALL_DIR)\pkgIndex.tcl"
@@ -295,7 +292,7 @@ test :
 test : setup $(ITCLLIB) $(ITCLSTUBLIB)
 	$(TCLSH) ..\tests\all.tcl $(TESTFLAGS) -loadfile <<
 	set env(ITCL_LIBRARY) [file normalize [file join $(MAKEDIR:\=/) .. library]]
-	load [file normalize [file join $(MAKEDIR:\=/) $(ITCLLIB:\=/)]]
+	package ifneeded $(PROJECT) $(ITCL_PATCH_LEVEL) [list load [file normalize [file join $(MAKEDIR:\=/) $(ITCLLIB:\=/)]]]
 <<
 !endif
 
@@ -442,6 +439,11 @@ tidy :
 	-del $(TMP_DIR)\*.res
 
 clean : tidy
+	@if exist $(TMP_DIR)\nul $(RMDIR) $(TMP_DIR)
+	@if exist $(WINDIR)\version.vc del $(WINDIR)\version.vc
+	@if exist $(WINDIR)\vercl.i del $(WINDIR)\vercl.i
+	@if exist $(WINDIR)\vercl.x del $(WINDIR)\vercl.x
+	@if exist $(WINDIR)\_junk.pch del $(WINDIR)\_junk.pch
 	-del $(OUT_DIR)\*.exp
 	-del $(OUT_DIR)\*.lib
 	-del $(OUT_DIR)\*.dll
