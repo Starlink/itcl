@@ -526,123 +526,100 @@ ItclCreateMemberFunc(
     if ((body != NULL) && (body[0] == '@')) {
         /* check for builtin cget isa and configure and mark them for
 	 * use of a different arglist "args" for TclOO !! */
+        imPtr->codePtr->flags |= ITCL_BUILTIN;
 	if (strcmp(name, "cget") == 0) {
-            imPtr->codePtr->flags |= ITCL_BUILTIN;
 	}
 	if (strcmp(name, "configure") == 0) {
 	    imPtr->argcount = 0;
 	    imPtr->maxargcount = -1;
-            imPtr->codePtr->flags |= ITCL_BUILTIN;
 	}
 	if (strcmp(name, "isa") == 0) {
-            imPtr->codePtr->flags |= ITCL_BUILTIN;
 	}
 	if (strcmp(name, "createhull") == 0) {
 	    imPtr->argcount = 0;
 	    imPtr->maxargcount = -1;
-            imPtr->codePtr->flags |= ITCL_BUILTIN;
 	}
 	if (strcmp(name, "keepcomponentoption") == 0) {
 	    imPtr->argcount = 0;
 	    imPtr->maxargcount = -1;
-            imPtr->codePtr->flags |= ITCL_BUILTIN;
 	}
 	if (strcmp(name, "ignorecomponentoption") == 0) {
 	    imPtr->argcount = 0;
 	    imPtr->maxargcount = -1;
-            imPtr->codePtr->flags |= ITCL_BUILTIN;
 	}
 	if (strcmp(name, "renamecomponentoption") == 0) {
 	    imPtr->argcount = 0;
 	    imPtr->maxargcount = -1;
-            imPtr->codePtr->flags |= ITCL_BUILTIN;
 	}
 	if (strcmp(name, "addoptioncomponent") == 0) {
 	    imPtr->argcount = 0;
 	    imPtr->maxargcount = -1;
-            imPtr->codePtr->flags |= ITCL_BUILTIN;
 	}
 	if (strcmp(name, "ignoreoptioncomponent") == 0) {
 	    imPtr->argcount = 0;
 	    imPtr->maxargcount = -1;
-            imPtr->codePtr->flags |= ITCL_BUILTIN;
 	}
 	if (strcmp(name, "renameoptioncomponent") == 0) {
 	    imPtr->argcount = 0;
 	    imPtr->maxargcount = -1;
-            imPtr->codePtr->flags |= ITCL_BUILTIN;
 	}
 	if (strcmp(name, "setupcomponent") == 0) {
 	    imPtr->argcount = 0;
 	    imPtr->maxargcount = -1;
-            imPtr->codePtr->flags |= ITCL_BUILTIN;
 	}
 	if (strcmp(name, "itcl_initoptions") == 0) {
 	    imPtr->argcount = 0;
 	    imPtr->maxargcount = -1;
-            imPtr->codePtr->flags |= ITCL_BUILTIN;
 	}
 	if (strcmp(name, "mytypemethod") == 0) {
 	    imPtr->argcount = 0;
 	    imPtr->maxargcount = -1;
-            imPtr->codePtr->flags |= ITCL_BUILTIN;
             imPtr->flags |= ITCL_COMMON;
 	}
 	if (strcmp(name, "mymethod") == 0) {
 	    imPtr->argcount = 0;
 	    imPtr->maxargcount = -1;
-            imPtr->codePtr->flags |= ITCL_BUILTIN;
 	}
 	if (strcmp(name, "mytypevar") == 0) {
 	    imPtr->argcount = 0;
 	    imPtr->maxargcount = -1;
-            imPtr->codePtr->flags |= ITCL_BUILTIN;
             imPtr->flags |= ITCL_COMMON;
 	}
 	if (strcmp(name, "myvar") == 0) {
 	    imPtr->argcount = 0;
 	    imPtr->maxargcount = -1;
-            imPtr->codePtr->flags |= ITCL_BUILTIN;
 	}
 	if (strcmp(name, "itcl_hull") == 0) {
 	    imPtr->argcount = 0;
 	    imPtr->maxargcount = -1;
-            imPtr->codePtr->flags |= ITCL_BUILTIN;
             imPtr->flags |= ITCL_COMPONENT;
 	}
 	if (strcmp(name, "callinstance") == 0) {
 	    imPtr->argcount = 0;
 	    imPtr->maxargcount = -1;
-            imPtr->codePtr->flags |= ITCL_BUILTIN;
 	}
 	if (strcmp(name, "getinstancevar") == 0) {
 	    imPtr->argcount = 0;
 	    imPtr->maxargcount = -1;
-            imPtr->codePtr->flags |= ITCL_BUILTIN;
 	}
 	if (strcmp(name, "myproc") == 0) {
 	    imPtr->argcount = 0;
 	    imPtr->maxargcount = -1;
-            imPtr->codePtr->flags |= ITCL_BUILTIN;
             imPtr->flags |= ITCL_COMMON;
 	}
 	if (strcmp(name, "installhull") == 0) {
 	    imPtr->argcount = 0;
 	    imPtr->maxargcount = -1;
-            imPtr->codePtr->flags |= ITCL_BUILTIN;
 	}
 	if (strcmp(name, "destroy") == 0) {
 	    imPtr->argcount = 0;
 	    imPtr->maxargcount = -1;
-            imPtr->codePtr->flags |= ITCL_BUILTIN;
 	}
 	if (strcmp(name, "installcomponent") == 0) {
 	    imPtr->argcount = 0;
 	    imPtr->maxargcount = -1;
-            imPtr->codePtr->flags |= ITCL_BUILTIN;
 	}
 	if (strcmp(name, "info") == 0) {
-            imPtr->codePtr->flags |= ITCL_BUILTIN;
             imPtr->flags |= ITCL_COMMON;
 	}
     }
@@ -1201,19 +1178,24 @@ CallItclObjectCmd(
         if (Itcl_GetUplevelCallFrame(interp, 0) != ptr) {
             /* we are executing an uplevel command (SF bug #244) */
             if (ioPtr != NULL) {
-                infoPtr = (ItclObjectInfo *)Tcl_GetAssocData(interp,
-                        ITCL_INTERP_DATA, NULL);
-                if (Itcl_GetStackSize(&infoPtr->contextStack) <= 1) {
-                    oPtr = ioPtr->oPtr;
+                if (imPtr->codePtr->flags & ITCL_BUILTIN) {
+                    /* it is a builtin command (SF bug #255 and # 256) */
                     result = ItclObjectCmd(imPtr, interp, oPtr, NULL, objc, objv);
                 } else {
-                    /* we are executing an uplevel command (SF bug #250) */
-                    if (Itcl_GetUplevelContext(interp, &contextIclsPtr, &contextIoPtr, -1) != TCL_OK) {
-                        return TCL_ERROR;
+                    infoPtr = (ItclObjectInfo *)Tcl_GetAssocData(interp,
+                            ITCL_INTERP_DATA, NULL);
+                    if (Itcl_GetStackSize(&infoPtr->contextStack) <= 1) {
+                        oPtr = ioPtr->oPtr;
+                        result = ItclObjectCmd(imPtr, interp, oPtr, NULL, objc, objv);
+                    } else {
+                        /* we are executing an uplevel command (SF bug #250) */
+                        if (Itcl_GetUplevelContext(interp, &contextIclsPtr, &contextIoPtr, -1) != TCL_OK) {
+                            return TCL_ERROR;
+                        }
+                        oPtr = contextIoPtr->oPtr;
+                        result =  ItclObjectCmd(imPtr, interp, oPtr, imPtr->iclsPtr->clsPtr,
+                                objc, objv);
                     }
-                    oPtr = contextIoPtr->oPtr;
-                    result =  ItclObjectCmd(imPtr, interp, oPtr, imPtr->iclsPtr->clsPtr,
-                            objc, objv);
                 }
             } else {
                 result = ItclObjectCmd(imPtr, interp, oPtr, NULL, objc, objv);
@@ -1718,8 +1700,6 @@ NRExecMethod(
     Tcl_HashEntry *entry;
     ItclClass *iclsPtr;
     ItclObject *ioPtr;
-    Tcl_Obj **newObjv;
-    int relNs = 0;
 
     ItclShowArgs(1, "NRExecMethod", objc, objv);
 
@@ -1754,7 +1734,7 @@ NRExecMethod(
      *  table for this class.
      */
     token = Tcl_GetString(objv[0]);
-    if ((strstr(token, "::") == NULL)) {
+    if (strstr(token, "::") == NULL) {
 	if (ioPtr != NULL) {
             entry = Tcl_FindHashEntry(&ioPtr->iclsPtr->resolveCmds,
                 (char *)imPtr->namePtr);
@@ -1765,23 +1745,6 @@ NRExecMethod(
 		imPtr = clookup->imPtr;
             }
         }
-    } else {
-        /* fix for SF bug #243 */
-        if (!(token[0] == ':' && token[1] == ':')
-            && ((imPtr->flags & ITCL_CONSTRUCTOR) == 0)
-            ) {
-            if (ioPtr != NULL) {
-                entry = Tcl_FindHashEntry(&ioPtr->iclsPtr->resolveCmds,
-                    (char *)imPtr->namePtr);
-
-                if (entry) {
-                    ItclCmdLookup *clookup;
-                    clookup = (ItclCmdLookup *)Tcl_GetHashValue(entry);
-                    imPtr = clookup->imPtr;
-                }
-                relNs = 1;
-            }
-        }
     }
 
     /*
@@ -1789,20 +1752,7 @@ NRExecMethod(
      *  the method in case it gets deleted during execution.
      */
     Itcl_PreserveData((ClientData)imPtr);
-    if (relNs) {
-        /* fix for SF bug #243 */
-        newObjv = (Tcl_Obj **)ckalloc(sizeof(Tcl_Obj *)*(objc));
-        newObjv[0] = imPtr->namePtr;
-        Tcl_IncrRefCount(newObjv[0]);
-        memcpy(newObjv + 1, objv + 1, ((objc - 1) * sizeof(Tcl_Obj *)));
-        result = Itcl_EvalMemberCode(interp, imPtr, ioPtr, objc, newObjv);
-    } else {
-        result = Itcl_EvalMemberCode(interp, imPtr, ioPtr, objc, objv);
-    }
-    if (relNs) {
-        Tcl_DecrRefCount(newObjv[0]);
-        ckfree((char *)newObjv);
-    }
+    result = Itcl_EvalMemberCode(interp, imPtr, ioPtr, objc, objv);
     Itcl_ReleaseData((ClientData)imPtr);
     return result;
 }

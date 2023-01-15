@@ -150,8 +150,8 @@ typedef struct ItclObjectInfo {
     Tcl_HashTable procMethods;      /* maps from procPtr to mFunc */
     Tcl_HashTable instances;        /* maps from instanceNumber to ioPtr */
     Tcl_HashTable objectInstances;  /* maps from ioPtr to instanceNumber */
-    Tcl_HashTable myEnsembles;      /* maps from ensemble name (::itcl::find)
-                                     * etc. to ensemble pathName */
+//    Tcl_HashTable myEnsembles;      /* maps from ensemble name (::itcl::find)
+//                                     * etc. to ensemble pathName */
     Tcl_HashTable classTypes;       /* maps from class type i.e. "widget"
                                      * to define value i.e. ITCL_WIDGET */
     int protection;                 /* protection level currently in effect */
@@ -206,6 +206,7 @@ typedef struct ItclObjectInfo {
     Tcl_Obj *infoVars3Ptr;
     Tcl_Obj *infoVars4Ptr;
     Tcl_Obj *typeDestructorArgumentPtr;
+    struct ItclObject *lastIoPtr;   /* last object constructed */
 } ItclObjectInfo;
 
 typedef struct EnsembleInfo {
@@ -822,6 +823,8 @@ MODULE_SCOPE int ItclAddClassDelegatedFunctionDictInfo(Tcl_Interp *interp,
         ItclClass *iclsPtr, ItclDelegatedFunction *idmPtr);
 MODULE_SCOPE ItclClass * GetClassFromClassName(Tcl_Interp *interp,
         const char *className, ItclClass *iclsPtr);
+MODULE_SCOPE int ItclClassCreateObject(ClientData clientData, Tcl_Interp *interp,
+        int objc, Tcl_Obj *const objv[]);
 MODULE_SCOPE Tcl_ObjCmdProc Itcl_BiMyProcCmd;
 MODULE_SCOPE Tcl_ObjCmdProc Itcl_BiInstallComponentCmd;
 MODULE_SCOPE Tcl_ObjCmdProc Itcl_BiCallInstanceCmd;
