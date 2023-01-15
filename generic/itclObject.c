@@ -29,6 +29,7 @@
  * See the file "license.terms" for information on usage and redistribution
  * of this file, and for a DISCLAIMER OF ALL WARRANTIES.
  */
+#include <tclInt.h>
 #include "itclInt.h"
 
 /*
@@ -1724,12 +1725,25 @@ ItclGetInstanceVar(
     if (hPtr != NULL) {
         vlookup = Tcl_GetHashValue(hPtr);
         ivPtr = vlookup->ivPtr;
-    } else {
-    }
     /*
      *  Install the object context and access the data member
      *  like any other variable.
      */
+    hPtr = Tcl_FindHashEntry(&contextIoPtr->objectVariables, (char *)ivPtr);
+    if (hPtr) {
+	Tcl_Obj *varName = Tcl_NewObj();
+	Tcl_Var varPtr = Tcl_GetHashValue(hPtr);
+	Tcl_GetVariableFullName(interp, varPtr, varName);
+
+	val = Tcl_GetVar2(interp, Tcl_GetString(varName), name2,
+		TCL_LEAVE_ERR_MSG);
+	Tcl_DecrRefCount(varName);
+	if (val) {
+	    return val;
+	}
+    }
+    }
+
     isItclOptions = 0;
     if (strcmp(name1, "itcl_options") == 0) {
         isItclOptions = 1;
@@ -1934,6 +1948,19 @@ ItclSetInstanceVar(
      *  Install the object context and access the data member
      *  like any other variable.
      */
+
+    hPtr = Tcl_FindHashEntry(&contextIoPtr->objectVariables, (char *)ivPtr);
+    if (hPtr) {
+	Tcl_Obj *varName = Tcl_NewObj();
+	Tcl_Var varPtr = Tcl_GetHashValue(hPtr);
+	Tcl_GetVariableFullName(interp, varPtr, varName);
+
+	val = Tcl_SetVar2(interp, Tcl_GetString(varName), name2, value,
+		TCL_LEAVE_ERR_MSG);
+	Tcl_DecrRefCount(varName);
+	return val;
+    }
+
     isItclOptions = 0;
     if (strcmp(name1, "itcl_options") == 0) {
         isItclOptions = 1;
@@ -2809,7 +2836,6 @@ ItclObjectCmd(
     Tcl_Obj **newObjv;
     Tcl_DString buffer;
     Tcl_Obj *myPtr;
-    ItclObjectInfo *infoPtr;
     ItclMemberFunc *imPtr;
     ItclClass *iclsPtr;
     Itcl_ListElem *elem;
@@ -2831,12 +2857,12 @@ ItclObjectCmd(
     myPtr = NULL;
     imPtr = (ItclMemberFunc *)clientData;
     iclsPtr = imPtr->iclsPtr;
-    infoPtr = imPtr->iclsPtr->infoPtr;
-    if ((oPtr == NULL) && (clsPtr == NULL)) {
-         isDirectCall = 1;
-    }
     if (oPtr == NULL) {
-	ClientData clientData2;
+	ItclClass *icPtr = NULL;
+	ItclObject *ioPtr = NULL;
+
+	isDirectCall = (clsPtr == NULL);
+
 	if ((imPtr->flags & ITCL_COMMON)
 	        && (imPtr->codePtr != NULL)
 	        && !(imPtr->codePtr->flags & ITCL_BUILTIN)) {
@@ -2844,31 +2870,12 @@ ItclObjectCmd(
 	            objc, objv);
             return result;
 	}
-	oPtr = NULL;
-	clientData2 = Itcl_GetCallFrameClientData(interp);
-	if ((clientData2 == NULL) && (oPtr == NULL)) {
-	    if (((imPtr->codePtr != NULL)
-	            && (imPtr->codePtr->flags & ITCL_BUILTIN))) {
-	        result = Itcl_InvokeProcedureMethod(imPtr->tmPtr, interp,
-	                objc, objv);
-                return result;
-	    }
-	    if (infoPtr->currIoPtr != NULL) {
-	        /* if we want to call methods in the constructor for example
-	         * config* methods, clientData
-	         * is still NULL, but we can use infoPtr->currIoPtr
-	         * for getting the TclOO object ptr
-	         */
-	        oPtr = infoPtr->currIoPtr->oPtr;
-	    } else {
-	        Tcl_AppendResult(interp,
-	                "ItclObjectCmd cannot get context object (NULL)", NULL);
-	        return TCL_ERROR;
-	    }
+
+	if (TCL_OK == Itcl_GetContext(interp, &icPtr, &ioPtr)) {
+	    oPtr = ioPtr ? ioPtr->oPtr : icPtr->oPtr;
+	} else {
+	    Tcl_Panic("No Context");
 	}
-	if (oPtr == NULL) {
-            oPtr = Tcl_ObjectContextObject((Tcl_ObjectContext)clientData2);
-        }
     }
     methodNamePtr = NULL;
     if (objv[0] != NULL) {
@@ -2995,48 +3002,6 @@ ItclObjectCmd(
         Tcl_DecrRefCount(myPtr);
     }
     return result;
-}
-
-/*
- * ------------------------------------------------------------------------
- *  ItclObjectUnknownCommand()
- *  syntax: is
- *  objv[0]    command name of myself (::itcl::methodset::objectUnknownCommand)
- *  objv[1]    object name for [self]
- *  objv[2]    object name as found on the stack
- *  objv[3]    method name
- * ------------------------------------------------------------------------
- */
-
-int
-ItclObjectUnknownCommand(
-    ClientData clientData,
-    Tcl_Interp *interp,
-    int objc,
-    Tcl_Obj *const *objv)
-{
-    Tcl_Object oPtr;
-    Tcl_Command cmd;
-    Tcl_CmdInfo cmdInfo;
-    ItclObject *ioPtr;
-    ItclObjectInfo *infoPtr;
-
-    ItclShowArgs(1, "ItclObjectUnknownCommand", objc, objv);
-    cmd = Tcl_GetCommandFromObj(interp, objv[1]);
-    if (Tcl_GetCommandInfoFromToken(cmd, &cmdInfo) != 1) {
-        Tcl_AppendResult(interp, "PANIC: cannot get Tcl_GetCommandFromObj for: ", Tcl_GetString(objv[1]), " in ItclObjectUnknownCommand", NULL);
-        return TCL_ERROR;
-    }
-    oPtr = cmdInfo.objClientData;
-    infoPtr = (ItclObjectInfo *)Tcl_GetAssocData(interp,
-            ITCL_INTERP_DATA, NULL);
-    ioPtr = (ItclObject *)Tcl_ObjectGetMetadata(oPtr,
-            infoPtr->object_meta_type);
-    Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
-            "bad option \"", Tcl_GetString(objv[3]), "\": should be one of...",
-	    (char*)NULL);
-    ItclReportObjectUsage(interp, ioPtr, NULL, NULL);
-    return TCL_ERROR;
 }
 
 /*
