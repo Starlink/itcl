@@ -237,11 +237,11 @@ Initialize (
     int opt;
     int isNew;
 
-    if (Tcl_InitStubs(interp, TCL_VERSION, 0) == NULL) {
+    if (Tcl_InitStubs(interp, "8.6", 0) == NULL) {
         return TCL_ERROR;
     }
 
-    ret = Tcl_OOInitStubs(interp);
+    ret = TclOOInitializeStubs(interp, "1.0");
     if (ret == NULL) {
         return TCL_ERROR;
     }
@@ -382,7 +382,7 @@ Initialize (
 #endif
 
     /* first create the Itcl base class as root of itcl classes */
-    if (Tcl_Eval(interp, clazzClassScript) != TCL_OK) {
+    if (Tcl_EvalEx(interp, clazzClassScript, -1, 0) != TCL_OK) {
         Tcl_Panic("cannot create Itcl root class ::itcl::clazz");
     }
     objPtr = Tcl_NewStringObj("::itcl::clazz", -1);
@@ -494,7 +494,7 @@ Itcl_Init (
         return TCL_ERROR;
     }
 
-    return  Tcl_Eval(interp, initScript);
+    return  Tcl_EvalEx(interp, initScript, -1, 0);
 }
 
 /*
@@ -519,7 +519,7 @@ Itcl_SafeInit (
     if (Initialize(interp) != TCL_OK) {
         return TCL_ERROR;
     }
-    return Tcl_Eval(interp, safeInitScript);
+    return Tcl_EvalEx(interp, safeInitScript, -1, 0);
 }
 
 /*
@@ -567,6 +567,7 @@ ItclCallCCommand(
         ckfree((char*)argv);
     }
     if (objProc != NULL) {
+#ifdef FIXED_ITCL_CALL_CONTEXT
 	Tcl_Namespace *callerNsPtr;
         ItclObjectInfo *infoPtr;
         callerNsPtr = Itcl_GetUplevelNamespace(interp, 1);
@@ -577,9 +578,12 @@ ItclCallCCommand(
 
 /* FIXME have to use ItclCallContext here !!! */
 /*	Itcl_PushStack(callerNsPtr, &infoPtr->namespaceStack); */
+#endif
         result = (*objProc)(cData, interp, Itcl_GetCallFrameObjc(interp)-1,
 	        Itcl_GetCallFrameObjv(interp)+1);
+#ifdef FIXED_ITCL_CALL_CONTEXT
 /*	Itcl_PopStack(&infoPtr->namespaceStack); */
+#endif
     }
     return result;
 }
@@ -706,6 +710,7 @@ ItclFinishCmd(
     int result;
 
     ItclShowArgs(1, "ItclFinishCmd", objc, objv);
+    result = TCL_OK;
     infoPtr = Tcl_GetAssocData(interp, ITCL_INTERP_DATA, NULL);
     if (infoPtr == NULL) {
         infoPtr = (ItclObjectInfo *)clientData;
@@ -816,8 +821,8 @@ ItclFinishCmd(
 
     Tcl_DecrRefCount(infoPtr->typeDestructorArgumentPtr);
 
-    Tcl_Eval(infoPtr->interp,
-            "::oo::define ::itcl::clazz deletemethod unknown");
+    Tcl_EvalEx(infoPtr->interp,
+            "::oo::define ::itcl::clazz deletemethod unknown", -1, 0);
 
     /* first have to look for the remaining memory leaks, then remove the next ifdef */
 #ifdef LATER
@@ -869,7 +874,7 @@ ItclFinishCmd(
     Itcl_FinishList();
 
     Itcl_ReleaseData((ClientData)infoPtr);
-    return TCL_OK;
+    return result;
 }
 
 #ifdef OBJ_REF_COUNT_DEBUG
