@@ -38,8 +38,8 @@ static void ItclDeleteOption(char *cdata);
 /*
  *  FORWARD DECLARATIONS
  */
-static void ItclDestroyClass(ClientData cdata);
-static void ItclFreeClass (char* cdata);
+static void ItclDestroyClass(void *cdata);
+static void ItclFreeClass (void* cdata);
 static void ItclDeleteFunction(ItclMemberFunc *imPtr);
 static void ItclDeleteComponent(ItclComponent *icPtr);
 static void ItclDeleteOption(char *cdata);
@@ -53,13 +53,13 @@ ItclPreserveClass(
 
 void
 ItclReleaseClass(
-    ClientData clientData)
+    void *clientData)
 {
     ItclClass *iclsPtr = (ItclClass *)clientData;
 
-    assert(iclsPtr->refCount != 0);
+    assert(iclsPtr->refCount > 0);
     if (iclsPtr->refCount-- <= 1) {
-	ItclFreeClass((char *) clientData);
+	ItclFreeClass(clientData);
     }
 }
 
@@ -93,7 +93,7 @@ void Itcl_DeleteMemberFunc (
 
 static void
 ItclDestroyClass2(
-    ClientData clientData)      /* The class being deleted. */
+    void *clientData)      /* The class being deleted. */
 {
     ItclClass *iclsPtr = (ItclClass *)clientData;
 
@@ -110,7 +110,7 @@ ItclDestroyClass2(
  */
 void
 ItclDeleteClassMetadata(
-    ClientData clientData)
+    void *clientData)
 {
     /*
      * This is how we get alerted from TclOO that the object corresponding
@@ -139,15 +139,14 @@ ItclDeleteClassMetadata(
 
 static int
 CallNewObjectInstance(
-    ClientData data[],
+    void *data[],
     Tcl_Interp *interp,
-    int result)
+    TCL_UNUSED(int))
 {
     ItclObjectInfo *infoPtr = (ItclObjectInfo *)data[0];
     const char *path = (const char *)data[1];
     Tcl_Object *oPtr = (Tcl_Object *)data[2];
     Tcl_Obj *nameObjPtr = (Tcl_Obj *)data[3];
-    (void)result;
 
     *oPtr = NULL;
     if (infoPtr->clazzClassPtr) {
@@ -565,18 +564,16 @@ errorOut:
  */
 void
 ItclDeleteClassVariablesNamespace(
-    Tcl_Interp *interp,
-    ItclClass *iclsPtr)
+    TCL_UNUSED(Tcl_Interp *),
+    TCL_UNUSED(ItclClass *))
 {
-    (void)interp;
-    (void)iclsPtr;
     /* TODO: why is this being skipped? */
     return;
 }
 
 static int
 CallDeleteOneObject(
-    ClientData data[],
+    void *data[],
     Tcl_Interp *interp,
     int result)
 {
@@ -646,7 +643,7 @@ deleteClassFail:
 
 static int
 CallDeleteOneClass(
-    ClientData data[],
+    void *data[],
     Tcl_Interp *interp,
     int result)
 {
@@ -786,7 +783,7 @@ Itcl_DeleteClass(
  */
 static void
 ItclDestroyClass(
-    ClientData cdata)  /* class definition to be destroyed */
+    void *cdata)  /* class definition to be destroyed */
 {
     ItclClass *iclsPtr = (ItclClass*)cdata;
 
@@ -819,7 +816,7 @@ ItclDestroyClass(
  */
 void
 ItclDestroyClassNamesp(
-    ClientData cdata)  /* class definition to be destroyed */
+    void *cdata)  /* class definition to be destroyed */
 {
     Tcl_HashEntry *hPtr;
     Tcl_HashSearch place;
@@ -958,7 +955,7 @@ ItclDestroyClassNamesp(
  */
 static void
 ItclFreeClass(
-    char *cdata)  /* class definition to be destroyed */
+    void *cdata)  /* class definition to be destroyed */
 {
     FOREACH_HASH_DECLS;
     Tcl_HashSearch place;
@@ -1351,7 +1348,7 @@ Itcl_FindClassNamespace(
 
 static int
 FinalizeCreateObject(
-    ClientData data[],
+    void *data[],
     Tcl_Interp *interp,
     int result)
 {
@@ -1369,13 +1366,13 @@ FinalizeCreateObject(
 
 static int
 CallCreateObject(
-    ClientData data[],
+    void *data[],
     Tcl_Interp *interp,
     int result)
 {
     Tcl_Obj *objNamePtr = (Tcl_Obj *)data[0];
     ItclClass *iclsPtr = (ItclClass *)data[1];
-    int objc = PTR2INT(data[2]);
+    Tcl_Size objc = PTR2INT(data[2]);
     Tcl_Obj **objv = (Tcl_Obj **)data[3];
 
     if (result == TCL_OK) {
@@ -1408,7 +1405,7 @@ CallCreateObject(
  */
 int
 Itcl_HandleClass(
-    ClientData clientData,   /* class definition */
+    void *clientData,        /* class definition */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
     Tcl_Obj *const objv[])   /* argument objects */
@@ -1465,9 +1462,9 @@ Itcl_HandleClass(
 
 int
 ItclClassCreateObject(
-    ClientData clientData,   /* IclObjectInfo */
+    void *clientData,        /* IclObjectInfo */
     Tcl_Interp *interp,      /* current interpreter */
-    int objc,                /* number of arguments */
+    size_t objc,             /* number of arguments */
     Tcl_Obj *const objv[])   /* argument objects */
 {
     Tcl_DString buffer;  /* buffer used to build object names */
@@ -1554,7 +1551,7 @@ ItclClassCreateObject(
                 do {
 		    Tcl_CmdInfo dummy;
 
-                    sprintf(unique,"%.200s%d", Tcl_GetString(iclsPtr->namePtr),
+                    sprintf(unique,"%.200s%" ITCL_Z_MODIFIER "u", Tcl_GetString(iclsPtr->namePtr),
                         iclsPtr->unique++);
                     unique[0] = tolower(UCHAR(unique[0]));
 
@@ -1751,7 +1748,7 @@ ItclResolveVarEntry(
 			     *  Set aside the second and third object-specific slot for the built-in
 			     *  "itcl_options" and "itcl_option_components" variable.
 			     */
-			    if (!iclsPtr->numInstanceVars) {
+			    if (iclsPtr->numInstanceVars == 0) {
 				iclsPtr->numInstanceVars += 3;
 			    }
 			    /*

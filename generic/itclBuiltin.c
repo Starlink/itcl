@@ -271,7 +271,7 @@ static int BiMethodListLen = sizeof(BiMethodList)/sizeof(BiMethod);
 
 void
 ItclRestoreInfoVars(
-    ClientData clientData)
+    void *clientData)
 {
     ItclObjectInfo *infoPtr = (ItclObjectInfo *)clientData;
     Tcl_Interp *interp = infoPtr->interp;
@@ -487,10 +487,10 @@ Itcl_InstallBiMethods(
  *  in its heritage.  Returns 1 if so, and 0 otherwise.
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 int
 Itcl_BiIsaCmd(
-    void *dummy,   /* class definition */
+    TCL_UNUSED(void *),      /* class definition */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
     Tcl_Obj *const objv[])   /* argument objects */
@@ -500,7 +500,6 @@ Itcl_BiIsaCmd(
 
     ItclClass *contextIclsPtr;
     ItclObject *contextIoPtr;
-    (void)dummy;
 
     /*
      *  Make sure that this command is being invoked in the proper
@@ -567,10 +566,10 @@ Itcl_BiIsaCmd(
  *  is executed, to bring the object up to date.
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 int
 Itcl_BiConfigureCmd(
-    void *dummy,   /* class definition */
+    TCL_UNUSED(void *),      /* class definition */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
     Tcl_Obj *const objv[])   /* argument objects */
@@ -585,7 +584,7 @@ Itcl_BiConfigureCmd(
     Tcl_HashSearch place;
     Tcl_HashEntry *hPtr;
     Tcl_Namespace *saveNsPtr;
-    Tcl_Obj * const *unparsedObjv;
+    Tcl_Obj *const *unparsedObjv;
     ItclClass *iclsPtr;
     ItclVariable *ivPtr;
     ItclVarLookup *vlookup;
@@ -595,10 +594,9 @@ Itcl_BiConfigureCmd(
     const char *lastval;
     const char *token;
     char *varName;
-    int i;
-    int unparsedObjc;
+    Tcl_Size i;
+    Tcl_Size unparsedObjc;
     int result;
-    (void)dummy;
 
     ItclShowArgs(1, "Itcl_BiConfigureCmd", objc, objv);
     vlookup = NULL;
@@ -842,10 +840,10 @@ configureDone:
  *  with name <option>.
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 int
 Itcl_BiCgetCmd(
-    void *dummy,   /* class definition */
+    TCL_UNUSED(void *),      /* class definition */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
     Tcl_Obj *const objv[])   /* argument objects */
@@ -858,7 +856,6 @@ Itcl_BiCgetCmd(
     const char *name;
     const char *val;
     int result;
-    (void)dummy;
 
     ItclShowArgs(1,"Itcl_BiCgetCmd", objc, objv);
     /*
@@ -1076,10 +1073,10 @@ ItclReportOption(
  *  so the code will not have to change if the base class changes.
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 static int
 NRBiChainCmd(
-    void *dummy,        /* not used */
+    TCL_UNUSED(void *),      /* not used */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
     Tcl_Obj *const objv[])   /* argument objects */
@@ -1099,11 +1096,10 @@ NRBiChainCmd(
     Tcl_DString buffer;
     Tcl_Obj *cmdlinePtr;
     Tcl_Obj **newobjv;
-    Tcl_Obj * const *cObjv;
-    int cObjc;
-    int idx;
+    Tcl_Obj *const *cObjv;
+    size_t cObjc;
+    size_t idx;
     Tcl_Obj *objPtr;
-    (void)dummy;
 
     ItclShowArgs(1, "Itcl_BiChainCmd", objc, objv);
 
@@ -1178,7 +1174,7 @@ NRBiChainCmd(
     while ((iclsPtr = Itcl_AdvanceHierIter(&hier)) != NULL) {
         hPtr = Tcl_FindHashEntry(&iclsPtr->functions, (char *)objPtr);
         if (hPtr) {
-	    int my_objc;
+	    Tcl_Size my_objc;
             imPtr = (ItclMemberFunc*)Tcl_GetHashValue(hPtr);
 
             /*
@@ -1209,7 +1205,7 @@ NRBiChainCmd(
     Itcl_DeleteHierIter(&hier);
     return result;
 }
-/* ARGSUSED */
+
 int
 Itcl_BiChainCmd(
     void *clientData,
@@ -1253,7 +1249,7 @@ PrepareCreateObject(
    Tcl_Interp *interp,
    ItclClass *iclsPtr,
    int objc,
-   Tcl_Obj * const *objv)
+   Tcl_Obj *const *objv)
 {
     Tcl_HashEntry *hPtr;
     Tcl_Obj **newObjv;
@@ -1316,7 +1312,7 @@ PrepareCreateObject(
  *
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 static int
 ItclBiClassUnknownCmd(
     void *clientData,   /* ItclObjectInfo Ptr */
@@ -1341,7 +1337,7 @@ ItclBiClassUnknownCmd(
     const char *resStr;
     const char *val;
     const char *funcName;
-    int lObjc;
+    Tcl_Size lObjc;
     int result;
     int offset;
     int useComponent;
@@ -1349,7 +1345,7 @@ ItclBiClassUnknownCmd(
     int isTypeMethod;
     int isStar;
     int isNew;
-    int idx;
+    Tcl_Size idx;
 
     ItclShowArgs(1, "ItclBiClassUnknownCmd", objc, objv);
     listPtr = NULL;
@@ -1615,7 +1611,7 @@ ItclUnknownGuts(
     const char *resStr;
     const char *val;
     const char *funcName;
-    int lObjc;
+    Tcl_Size lObjc;
     int result;
     int offset;
     int useComponent;
@@ -1624,7 +1620,7 @@ ItclUnknownGuts(
     int isStar;
     int isTypeMethod;
     int isNew;
-    int idx;
+    Tcl_Size idx;
 
     if (objc < 2) {
         Tcl_AppendResult(interp, "wrong # args: should be one of...",
@@ -1881,11 +1877,11 @@ static Tcl_Obj *makeAsOptionInfo(
     Tcl_Interp *interp,
     Tcl_Obj *optNamePtr,
     ItclDelegatedOption *idoPtr,
-    int lObjc2,
-    Tcl_Obj * const *lObjv2)
+    Tcl_Size lObjc2,
+    Tcl_Obj *const *lObjv2)
 {
     Tcl_Obj *objPtr;
-    int j;
+    Tcl_Size j;
 
     objPtr = Tcl_NewListObj(0, NULL);
     Tcl_ListObjAppendElement(interp, objPtr, Tcl_NewStringObj(
@@ -1924,10 +1920,10 @@ static Tcl_Obj *makeAsOptionInfo(
  *  is executed, to bring the object up to date.
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 static int
 ItclExtendedConfigure(
-    void *dummy,   /* class definition */
+    TCL_UNUSED(void *),      /* class definition */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
     Tcl_Obj *const objv[])   /* argument objects */
@@ -1963,15 +1959,14 @@ ItclExtendedConfigure(
     ItclOption *ioptPtr;
     ItclObjectInfo *infoPtr;
     const char *val;
-    int lObjc;
-    int lObjc2;
-    int lObjc3;
-    int i;
+    Tcl_Size lObjc;
+    Tcl_Size lObjc2;
+    Tcl_Size lObjc3;
+    Tcl_Size i;
     int j;
     int isNew;
     int result;
     int isOneOption;
-    (void)dummy;
 
     ItclShowArgs(1, "ItclExtendedConfigure", objc, objv);
     ioptPtr = NULL;
@@ -2592,10 +2587,10 @@ ItclExtendedConfigure(
  *  with name <option>.
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 static int
 ItclExtendedCget(
-    void *dummy,   /* class definition */
+    TCL_UNUSED(void *),      /* class definition */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
     Tcl_Obj *const objv[])   /* argument objects */
@@ -2619,7 +2614,6 @@ ItclExtendedCget(
     const char *val;
     int i;
     int result;
-    (void)dummy;
 
     ItclShowArgs(1,"ItclExtendedCget", objc, objv);
     /*
@@ -2831,10 +2825,10 @@ ItclExtendedCget(
  *
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 static int
 ItclExtendedSetGet(
-    void *dummy,   /* class definition */
+    TCL_UNUSED(void *),      /* class definition */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
     Tcl_Obj *const objv[])   /* argument objects */
@@ -2850,7 +2844,6 @@ ItclExtendedSetGet(
     const char *val;
     int result;
     int setValue;
-    (void)dummy;
 
     ItclShowArgs(1, "ItclExtendedSetGet", objc, objv);
     imvPtr = NULL;
@@ -2950,10 +2943,10 @@ ItclExtendedSetGet(
  *
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 int
 Itcl_BiInstallComponentCmd(
-    void *dummy,   /* class definition */
+    TCL_UNUSED(void *),      /* class definition */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
     Tcl_Obj *const objv[])   /* argument objects */
@@ -2969,7 +2962,6 @@ Itcl_BiInstallComponentCmd(
     const char *token;
     int numOpts;
     int result;
-    (void)dummy;
 
     ItclShowArgs(1, "Itcl_BiInstallComponentCmd", objc, objv);
     /*
@@ -3085,10 +3077,10 @@ Itcl_BiInstallComponentCmd(
  *
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 static int
 Itcl_BiDestroyCmd(
-    void *dummy,   /* class definition */
+    TCL_UNUSED(void *),      /* class definition */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
     Tcl_Obj *const objv[])   /* argument objects */
@@ -3097,7 +3089,6 @@ Itcl_BiDestroyCmd(
     ItclClass *contextIclsPtr;
     ItclObject *contextIoPtr;
     int result;
-    (void)dummy;
 
     /*
      *  Make sure that this command is being invoked in the proper
@@ -3163,10 +3154,10 @@ Itcl_BiDestroyCmd(
  *
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 int
 Itcl_BiCallInstanceCmd(
-    void *dummy,   /* class definition */
+    TCL_UNUSED(void *),      /* class definition */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
     Tcl_Obj *const objv[])   /* argument objects */
@@ -3179,7 +3170,6 @@ Itcl_BiCallInstanceCmd(
     ItclObject *ioPtr;
     const char *token;
     int result;
-    (void)dummy;
 
     /*
      *  Make sure that this command is being invoked in the proper
@@ -3231,10 +3221,10 @@ Itcl_BiCallInstanceCmd(
  *
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 int
 Itcl_BiGetInstanceVarCmd(
-    void *dummy,   /* class definition */
+    TCL_UNUSED(void *),      /* class definition */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
     Tcl_Obj *const objv[])   /* argument objects */
@@ -3247,7 +3237,6 @@ Itcl_BiGetInstanceVarCmd(
     ItclObject *ioPtr;
     const char *token;
     int result;
-    (void)dummy;
 
     /*
      *  Make sure that this command is being invoked in the proper
@@ -3298,10 +3287,10 @@ Itcl_BiGetInstanceVarCmd(
  *
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 int
 Itcl_BiMyTypeMethodCmd(
-    void *dummy,   /* class definition */
+    TCL_UNUSED(void *),      /* class definition */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
     Tcl_Obj *const objv[])   /* argument objects */
@@ -3311,7 +3300,6 @@ Itcl_BiMyTypeMethodCmd(
     ItclClass *contextIclsPtr;
     ItclObject *contextIoPtr;
     int i;
-    (void)dummy;
 
     /*
      *  Make sure that this command is being invoked in the proper
@@ -3349,10 +3337,10 @@ Itcl_BiMyTypeMethodCmd(
  *
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 int
 Itcl_BiMyMethodCmd(
-    void *dummy,   /* class definition */
+    TCL_UNUSED(void *),      /* class definition */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
     Tcl_Obj *const objv[])   /* argument objects */
@@ -3361,7 +3349,6 @@ Itcl_BiMyMethodCmd(
     int i;
     ItclClass *contextIclsPtr;
     ItclObject *contextIoPtr;
-    (void)dummy;
 
     /*
      *  Make sure that this command is being invoked in the proper
@@ -3399,10 +3386,10 @@ Itcl_BiMyMethodCmd(
  *
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 int
 Itcl_BiMyProcCmd(
-    void *dummy,   /* class definition */
+    TCL_UNUSED(void *),      /* class definition */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
     Tcl_Obj *const objv[])   /* argument objects */
@@ -3412,7 +3399,6 @@ Itcl_BiMyProcCmd(
     ItclClass *contextIclsPtr;
     ItclObject *contextIoPtr;
     int i;
-    (void)dummy;
 
     /*
      *  Make sure that this command is being invoked in the proper
@@ -3451,10 +3437,10 @@ Itcl_BiMyProcCmd(
  *
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 int
 Itcl_BiMyTypeVarCmd(
-    void *dummy,   /* class definition */
+    TCL_UNUSED(void *),      /* class definition */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
     Tcl_Obj *const objv[])   /* argument objects */
@@ -3464,7 +3450,6 @@ Itcl_BiMyTypeVarCmd(
     ItclClass *contextIclsPtr;
     ItclObject *contextIoPtr;
     int i;
-    (void)dummy;
 
     /*
      *  Make sure that this command is being invoked in the proper
@@ -3504,10 +3489,10 @@ Itcl_BiMyTypeVarCmd(
  *
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 int
 Itcl_BiMyVarCmd(
-    void *dummy,   /* class definition */
+    TCL_UNUSED(void *),      /* class definition */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
     Tcl_Obj *const objv[])   /* argument objects */
@@ -3515,7 +3500,6 @@ Itcl_BiMyVarCmd(
     Tcl_Obj *resultPtr;
     ItclClass *contextIclsPtr;
     ItclObject *contextIoPtr;
-    (void)dummy;
 
     /*
      *  Make sure that this command is being invoked in the proper
@@ -3549,10 +3533,10 @@ Itcl_BiMyVarCmd(
  *
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 int
 Itcl_BiItclHullCmd(
-    void *dummy,   /* class definition */
+    TCL_UNUSED(void *),      /* class definition */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
     Tcl_Obj *const objv[])   /* argument objects */
@@ -3560,9 +3544,6 @@ Itcl_BiItclHullCmd(
     ItclClass *contextIclsPtr;
     ItclObject *contextIoPtr;
     const char *val;
-    (void)dummy;
-    (void)objc;
-    (void)objv;
 
     /*
      *  Make sure that this command is being invoked in the proper

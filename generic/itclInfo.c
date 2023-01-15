@@ -312,7 +312,7 @@ static void ItclGetInfoUsage(Tcl_Interp *interp, Tcl_Obj*objPtr,
 
 static int
 InfoGutsFinish(
-    ClientData data[],
+    void *data[],
     TCL_UNUSED(Tcl_Interp *),
     int result)
 {
@@ -392,13 +392,19 @@ ItclInfoGuts(
 
     Tcl_NRAddCallback(interp, InfoGutsFinish, framePtr, infoPtr, cPtr, NULL);
     Tcl_GetCommandInfoFromToken(infoPtr->infoCmd, &info);
+#if TCL_MAJOR_VERSION > 8
+    if (info.isNativeObjectProc == 2) {
+	return Tcl_NRCallObjProc2(interp, info.objProc2, info.objClientData2,
+		objc-1, objv+1);
+    }
+#endif
     return Tcl_NRCallObjProc(interp, info.objProc, info.objClientData,
 	    objc-1, objv+1);
 }
 
 static int
 NRInfoWrap(
-    ClientData clientData,
+    void *clientData,
     Tcl_Interp *interp,
     int objc,
     Tcl_Obj *const objv[])
@@ -428,13 +434,19 @@ NRInfoWrap(
     /* Have a subcommand.  Pass on to the ensemble */
 
     Tcl_GetCommandInfoFromToken(infoPtr->infoCmd, &info);
+#if TCL_MAJOR_VERSION > 8
+    if (info.isNativeObjectProc == 2) {
+	return Tcl_NRCallObjProc2(interp, info.objProc2, info.objClientData2,
+		objc, objv);
+    }
+#endif
     return Tcl_NRCallObjProc(interp, info.objProc, info.objClientData,
 	    objc, objv);
 }
 
 static int
 InfoWrap(
-    ClientData clientData,
+    void *clientData,
     Tcl_Interp *interp,
     int objc,
     Tcl_Obj *const objv[])
@@ -444,7 +456,7 @@ InfoWrap(
 
 static void
 InfoCmdDelete(
-    ClientData clientData)
+    void *clientData)
 {
     ItclObjectInfo *infoPtr = (ItclObjectInfo *)clientData;
 
@@ -658,10 +670,10 @@ ItclGetInfoDelegatedUsage(
  *  Returns a status TCL_OK/TCL_ERROR to indicate success/failure.
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 int
 Itcl_BiInfoClassCmd(
-    TCL_UNUSED(ClientData), /* ItclObjectInfo Ptr */
+    TCL_UNUSED(void *),    /* ItclObjectInfo Ptr */
     Tcl_Interp *interp,    /* current interpreter */
     int objc,              /* number of arguments */
     Tcl_Obj *const objv[]) /* argument objects */
@@ -684,25 +696,25 @@ Itcl_BiInfoClassCmd(
      *  signal an error.
      */
     if (Itcl_GetContext(interp, &contextIclsPtr, &contextIoPtr) != TCL_OK) {
-        /* try it the hard way */
-	ClientData clientData;
-        ItclObjectInfo *infoPtr;
-        Tcl_Object oPtr;
+	/* try it the hard way */
+	void *clientData;
+	ItclObjectInfo *infoPtr;
+	Tcl_Object oPtr;
 	clientData = Itcl_GetCallFrameClientData(interp);
-        infoPtr = (ItclObjectInfo *)Tcl_GetAssocData(interp,
-                ITCL_INTERP_DATA, NULL);
+	infoPtr = (ItclObjectInfo *)Tcl_GetAssocData(interp,
+		ITCL_INTERP_DATA, NULL);
 	if (clientData != NULL) {
-            oPtr = Tcl_ObjectContextObject((Tcl_ObjectContext)clientData);
-            contextIoPtr = (ItclObject *)Tcl_ObjectGetMetadata(oPtr,
-	            infoPtr->object_meta_type);
-            contextIclsPtr = contextIoPtr->iclsPtr;
+		oPtr = Tcl_ObjectContextObject((Tcl_ObjectContext)clientData);
+		contextIoPtr = (ItclObject *)Tcl_ObjectGetMetadata(oPtr,
+			infoPtr->object_meta_type);
+		contextIclsPtr = contextIoPtr->iclsPtr;
 	}
 	if ((contextIoPtr == NULL) || (contextIclsPtr == NULL)) {
-            Tcl_SetObjResult(interp, Tcl_NewStringObj(
+	    Tcl_SetObjResult(interp, Tcl_NewStringObj(
 		    "\nget info like this instead: " \
 		    "\n  namespace eval className { info class }", -1));
-            return TCL_ERROR;
-        }
+		    return TCL_ERROR;
+	}
     }
 
     /*
@@ -738,10 +750,10 @@ Itcl_BiInfoClassCmd(
  *  Returns a status TCL_OK/TCL_ERROR to indicate success/failure.
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 static int
 Itcl_BiInfoClassOptionsCmd(
-    TCL_UNUSED(ClientData), /* ItclObjectInfo Ptr */
+    TCL_UNUSED(void *),    /* ItclObjectInfo Ptr */
     Tcl_Interp *interp,    /* current interpreter */
     int objc,              /* number of arguments */
     Tcl_Obj *const objv[]) /* argument objects */
@@ -760,9 +772,9 @@ Itcl_BiInfoClassOptionsCmd(
     const char *name;
     const char *val;
     const char *pattern;
-    int lObjc;
+    Tcl_Size lObjc;
     int result;
-    int i;
+    Tcl_Size i;
 
     ItclShowArgs(1, "Itcl_BiInfoClassOptionsCmd", objc, objv);
     iclsPtr = NULL;
@@ -849,10 +861,10 @@ Itcl_BiInfoClassOptionsCmd(
  *  Returns a status TCL_OK/TCL_ERROR to indicate success/failure.
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 static int
 Itcl_BiInfoContextCmd(
-    TCL_UNUSED(ClientData), /* ItclObjectInfo Ptr */
+    TCL_UNUSED(void *),    /* ItclObjectInfo Ptr */
     Tcl_Interp *interp,    /* current interpreter */
     int objc,              /* number of arguments */
     Tcl_Obj *const objv[]) /* argument objects */
@@ -888,10 +900,10 @@ Itcl_BiInfoContextCmd(
  *  Returns a status TCL_OK/TCL_ERROR to indicate success/failure.
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 int
 Itcl_BiInfoInheritCmd(
-    TCL_UNUSED(ClientData), /* ItclObjectInfo Ptr */
+    TCL_UNUSED(void *),    /* ItclObjectInfo Ptr */
     Tcl_Interp *interp,    /* current interpreter */
     int objc,              /* number of arguments */
     Tcl_Obj *const objv[]) /* argument objects */
@@ -948,10 +960,10 @@ Itcl_BiInfoInheritCmd(
  *  Returns a status TCL_OK/TCL_ERROR to indicate success/failure.
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 int
 Itcl_BiInfoHeritageCmd(
-    TCL_UNUSED(ClientData), /* ItclObjectInfo Ptr */
+    TCL_UNUSED(void *),    /* ItclObjectInfo Ptr */
     Tcl_Interp *interp,    /* current interpreter */
     int objc,              /* number of arguments */
     Tcl_Obj *const objv[]) /* argument objects */
@@ -1018,10 +1030,10 @@ Itcl_BiInfoHeritageCmd(
  *  to indicate success/failure.
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 int
 Itcl_BiInfoFunctionCmd(
-    TCL_UNUSED(ClientData), /* ItclObjectInfo Ptr */
+    TCL_UNUSED(void *),    /* ItclObjectInfo Ptr */
     Tcl_Interp *interp,    /* current interpreter */
     int objc,              /* number of arguments */
     Tcl_Obj *const objv[]) /* argument objects */
@@ -1258,10 +1270,10 @@ Itcl_BiInfoFunctionCmd(
  * ------------------------------------------------------------------------
  */
 /*&&&1*/
-/* ARGSUSED */
+
 int
 Itcl_BiInfoVariableCmd(
-    TCL_UNUSED(ClientData), /* ItclObjectInfo Ptr */
+    TCL_UNUSED(void *),    /* ItclObjectInfo Ptr */
     Tcl_Interp *interp,    /* current interpreter */
     int objc,              /* number of arguments */
     Tcl_Obj *const objv[]) /* argument objects */
@@ -1281,7 +1293,7 @@ Itcl_BiInfoVariableCmd(
     int i;
     int result;
 
-    ClientData cfClientData;
+    void *cfClientData;
     ItclObjectInfo *infoPtr;
     Tcl_Object oPtr;
     int doAppend;
@@ -1602,10 +1614,10 @@ Itcl_BiInfoVariableCmd(
  *  to indicate success/failure.
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 int
 Itcl_BiInfoVarsCmd(
-    ClientData clientData, /* ItclObjectInfo Ptr */
+    void *clientData, /* ItclObjectInfo Ptr */
     Tcl_Interp *interp,    /* current interpreter */
     int objc,              /* number of arguments */
     Tcl_Obj *const objv[]) /* argument objects */
@@ -1742,10 +1754,10 @@ Itcl_BiInfoVarsCmd(
  *  the unknown handler for the ::itcl::builtin::Info ensemble
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 int
 Itcl_BiInfoUnknownCmd(
-    ClientData clientData,   /* ItclObjectInfo Ptr */
+    void *clientData,   /* ItclObjectInfo Ptr */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
     Tcl_Obj *const objv[])   /* argument objects */
@@ -1827,10 +1839,10 @@ Itcl_BiInfoUnknownCmd(
  *  Returns a status TCL_OK/TCL_ERROR to indicate success/failure.
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 int
 Itcl_BiInfoBodyCmd(
-    TCL_UNUSED(ClientData), /* ItclObjectInfo Ptr */
+    TCL_UNUSED(void *),    /* ItclObjectInfo Ptr */
     Tcl_Interp *interp,    /* current interpreter */
     int objc,              /* number of arguments */
     Tcl_Obj *const objv[]) /* argument objects */
@@ -1930,10 +1942,10 @@ Itcl_BiInfoBodyCmd(
  *  Returns a status TCL_OK/TCL_ERROR to indicate success/failure.
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 int
 Itcl_BiInfoArgsCmd(
-    TCL_UNUSED(ClientData), /* ItclObjectInfo Ptr */
+    TCL_UNUSED(void *),    /* ItclObjectInfo Ptr */
     Tcl_Interp *interp,    /* current interpreter */
     int objc,              /* number of arguments */
     Tcl_Obj *const objv[]) /* argument objects */
@@ -2039,10 +2051,10 @@ Itcl_BiInfoArgsCmd(
  *  to indicate success/failure.
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 int
 Itcl_BiInfoOptionCmd(
-    TCL_UNUSED(ClientData), /* ItclObjectInfo Ptr */
+    TCL_UNUSED(void *),    /* ItclObjectInfo Ptr */
     Tcl_Interp *interp,    /* current interpreter */
     int objc,              /* number of arguments */
     Tcl_Obj *const objv[]) /* argument objects */
@@ -2342,10 +2354,10 @@ Itcl_BiInfoOptionCmd(
  *  to indicate success/failure.
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 int
 Itcl_BiInfoComponentCmd(
-    TCL_UNUSED(ClientData), /* ItclObjectInfo Ptr */
+    TCL_UNUSED(void *),    /* ItclObjectInfo Ptr */
     Tcl_Interp *interp,    /* current interpreter */
     int objc,              /* number of arguments */
     Tcl_Obj *const objv[]) /* argument objects */
@@ -2561,10 +2573,10 @@ Itcl_BiInfoComponentCmd(
  *  to indicate success/failure.
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 static int
 Itcl_BiInfoWidgetCmd(
-    TCL_UNUSED(ClientData), /* ItclObjectInfo Ptr */
+    TCL_UNUSED(void *),    /* ItclObjectInfo Ptr */
     Tcl_Interp *interp,    /* current interpreter */
     int objc,              /* number of arguments */
     Tcl_Obj *const objv[]) /* argument objects */
@@ -2590,7 +2602,7 @@ Itcl_BiInfoWidgetCmd(
     contextIclsPtr = NULL;
     if (Itcl_GetContext(interp, &contextIclsPtr, &contextIoPtr) != TCL_OK) {
         /* try it the hard way */
-	ClientData clientData;
+	void *clientData;
         ItclObjectInfo *infoPtr;
         Tcl_Object oPtr;
 	clientData = Itcl_GetCallFrameClientData(interp);
@@ -2653,10 +2665,10 @@ Itcl_BiInfoWidgetCmd(
  *  to indicate success/failure.
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 static int
 Itcl_BiInfoExtendedClassCmd(
-    TCL_UNUSED(ClientData), /* ItclObjectInfo Ptr */
+    TCL_UNUSED(void *),    /* ItclObjectInfo Ptr */
     Tcl_Interp *interp,    /* current interpreter */
     int objc,              /* number of arguments */
     Tcl_Obj *const objv[]) /* argument objects */
@@ -2716,7 +2728,7 @@ Itcl_BiInfoExtendedClassCmd(
     }
     contextIclsPtr = Tcl_GetHashValue(hPtr);
 
-#elif defined __cplusplus
+#else
     (void)interp;
     (void)objc;
     (void)objv;
@@ -2740,10 +2752,10 @@ Itcl_BiInfoExtendedClassCmd(
  *  to indicate success/failure.
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 static int
 Itcl_BiInfoDelegatedCmd(
-    TCL_UNUSED(ClientData), /* ItclObjectInfo Ptr */
+    TCL_UNUSED(void *),    /* ItclObjectInfo Ptr */
     Tcl_Interp *interp,    /* current interpreter */
     int objc,              /* number of arguments */
     Tcl_Obj *const objv[]) /* argument objects */
@@ -2803,7 +2815,7 @@ Itcl_BiInfoDelegatedCmd(
     }
     contextIclsPtr = Tcl_GetHashValue(hPtr);
 
-#elif defined __cplusplus
+#else
     (void)interp;
     (void)objc;
     (void)objv;
@@ -2825,10 +2837,10 @@ Itcl_BiInfoDelegatedCmd(
  *  Returns a status TCL_OK/TCL_ERROR to indicate success/failure.
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 static int
 Itcl_BiInfoTypeCmd(
-    TCL_UNUSED(ClientData), /* ItclObjectInfo Ptr */
+    TCL_UNUSED(void *),    /* ItclObjectInfo Ptr */
     Tcl_Interp *interp,    /* current interpreter */
     int objc,              /* number of arguments */
     Tcl_Obj *const objv[]) /* argument objects */
@@ -2854,7 +2866,7 @@ Itcl_BiInfoTypeCmd(
     contextIclsPtr = NULL;
     if (Itcl_GetContext(interp, &contextIclsPtr, &contextIoPtr) != TCL_OK) {
         /* try it the hard way */
-	ClientData clientData;
+	void *clientData;
         ItclObjectInfo *infoPtr;
         Tcl_Object oPtr;
 	clientData = Itcl_GetCallFrameClientData(interp);
@@ -2913,10 +2925,10 @@ Itcl_BiInfoTypeCmd(
  *  Returns a status TCL_OK/TCL_ERROR to indicate success/failure.
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 static int
 Itcl_BiInfoHullTypeCmd(
-    TCL_UNUSED(ClientData), /* ItclObjectInfo Ptr */
+    TCL_UNUSED(void *),    /* ItclObjectInfo Ptr */
     Tcl_Interp *interp,    /* current interpreter */
     int objc,              /* number of arguments */
     Tcl_Obj *const objv[]) /* argument objects */
@@ -2939,7 +2951,7 @@ Itcl_BiInfoHullTypeCmd(
     contextIclsPtr = NULL;
     if (Itcl_GetContext(interp, &contextIclsPtr, &contextIoPtr) != TCL_OK) {
         /* try it the hard way */
-	ClientData clientData;
+	void *clientData;
         ItclObjectInfo *infoPtr;
         Tcl_Object oPtr;
 	clientData = Itcl_GetCallFrameClientData(interp);
@@ -2980,10 +2992,10 @@ Itcl_BiInfoHullTypeCmd(
  *  Returns a status TCL_OK/TCL_ERROR to indicate success/failure.
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 static int
 Itcl_BiInfoDefaultCmd(
-    TCL_UNUSED(ClientData), /* ItclObjectInfo Ptr */
+    TCL_UNUSED(void *),    /* ItclObjectInfo Ptr */
     Tcl_Interp *interp,    /* current interpreter */
     int objc,              /* number of arguments */
     Tcl_Obj *const objv[]) /* argument objects */
@@ -3075,10 +3087,10 @@ Itcl_BiInfoDefaultCmd(
  *  Returns a status TCL_OK/TCL_ERROR to indicate success/failure.
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 static int
 Itcl_BiInfoMethodCmd(
-    TCL_UNUSED(ClientData), /* ItclObjectInfo Ptr */
+    TCL_UNUSED(void *),    /* ItclObjectInfo Ptr */
     Tcl_Interp *interp,    /* current interpreter */
     int objc,              /* number of arguments */
     Tcl_Obj *const objv[]) /* argument objects */
@@ -3302,10 +3314,10 @@ Itcl_BiInfoMethodCmd(
  *  Returns a status TCL_OK/TCL_ERROR to indicate success/failure.
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 static int
 Itcl_BiInfoMethodsCmd(
-    TCL_UNUSED(ClientData), /* ItclObjectInfo Ptr */
+    TCL_UNUSED(void *),    /* ItclObjectInfo Ptr */
     Tcl_Interp *interp,    /* current interpreter */
     int objc,              /* number of arguments */
     Tcl_Obj *const objv[]) /* argument objects */
@@ -3400,10 +3412,10 @@ Itcl_BiInfoMethodsCmd(
  *  Returns a status TCL_OK/TCL_ERROR to indicate success/failure.
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 static int
 Itcl_BiInfoOptionsCmd(
-    TCL_UNUSED(ClientData), /* ItclObjectInfo Ptr */
+    TCL_UNUSED(void *),    /* ItclObjectInfo Ptr */
     Tcl_Interp *interp,    /* current interpreter */
     int objc,              /* number of arguments */
     Tcl_Obj *const objv[]) /* argument objects */
@@ -3422,9 +3434,9 @@ Itcl_BiInfoOptionsCmd(
     const char *name;
     const char *val;
     const char *pattern;
-    int lObjc;
+    Tcl_Size lObjc;
     int result;
-    int i;
+    Tcl_Size i;
 
     ItclShowArgs(1, "Itcl_BiInfoOptionsCmd", objc, objv);
     iclsPtr = NULL;
@@ -3520,10 +3532,10 @@ Itcl_BiInfoOptionsCmd(
  *  Returns a status TCL_OK/TCL_ERROR to indicate success/failure.
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 static int
 Itcl_BiInfoTypesCmd(
-    ClientData clientData, /* ItclObjectInfo Ptr */
+    void *clientData,      /* ItclObjectInfo Ptr */
     Tcl_Interp *interp,    /* current interpreter */
     int objc,              /* number of arguments */
     Tcl_Obj *const objv[]) /* argument objects */
@@ -3573,10 +3585,10 @@ Itcl_BiInfoTypesCmd(
  *  Returns a status TCL_OK/TCL_ERROR to indicate success/failure.
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 static int
 Itcl_BiInfoComponentsCmd(
-    TCL_UNUSED(ClientData), /* ItclObjectInfo Ptr */
+    TCL_UNUSED(void *),    /* ItclObjectInfo Ptr */
     Tcl_Interp *interp,    /* current interpreter */
     int objc,              /* number of arguments */
     Tcl_Obj *const objv[]) /* argument objects */
@@ -3644,10 +3656,10 @@ Itcl_BiInfoComponentsCmd(
  *  Returns a status TCL_OK/TCL_ERROR to indicate success/failure.
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 static int
 Itcl_BiInfoTypeMethodCmd(
-    TCL_UNUSED(ClientData), /* ItclObjectInfo Ptr */
+    TCL_UNUSED(void *),    /* ItclObjectInfo Ptr */
     Tcl_Interp *interp,    /* current interpreter */
     int objc,              /* number of arguments */
     Tcl_Obj *const objv[]) /* argument objects */
@@ -3872,10 +3884,10 @@ Itcl_BiInfoTypeMethodCmd(
  *  Returns a status TCL_OK/TCL_ERROR to indicate success/failure.
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 static int
 Itcl_BiInfoTypeMethodsCmd(
-    TCL_UNUSED(ClientData), /* ItclObjectInfo Ptr */
+    TCL_UNUSED(void *),    /* ItclObjectInfo Ptr */
     Tcl_Interp *interp,    /* current interpreter */
     int objc,              /* number of arguments */
     Tcl_Obj *const objv[]) /* argument objects */
@@ -3977,10 +3989,10 @@ Itcl_BiInfoTypeMethodsCmd(
  *  Returns a status TCL_OK/TCL_ERROR to indicate success/failure.
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 static int
 Itcl_BiInfoTypeVarsCmd(
-    TCL_UNUSED(ClientData), /* ItclObjectInfo Ptr */
+    TCL_UNUSED(void *),    /* ItclObjectInfo Ptr */
     Tcl_Interp *interp,    /* current interpreter */
     int objc,              /* number of arguments */
     Tcl_Obj *const objv[]) /* argument objects */
@@ -4034,10 +4046,10 @@ Itcl_BiInfoTypeVarsCmd(
  *  Returns a status TCL_OK/TCL_ERROR to indicate success/failure.
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 static int
 Itcl_BiInfoTypeVariableCmd(
-    TCL_UNUSED(ClientData), /* ItclObjectInfo Ptr */
+    TCL_UNUSED(void *),    /* ItclObjectInfo Ptr */
     Tcl_Interp *interp,    /* current interpreter */
     int objc,              /* number of arguments */
     Tcl_Obj *const objv[]) /* argument objects */
@@ -4284,10 +4296,10 @@ Itcl_BiInfoTypeVariableCmd(
  *  Returns a status TCL_OK/TCL_ERROR to indicate success/failure.
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 static int
 Itcl_BiInfoVariablesCmd(
-    TCL_UNUSED(ClientData), /* ItclObjectInfo Ptr */
+    TCL_UNUSED(void *),    /* ItclObjectInfo Ptr */
     Tcl_Interp *interp,    /* current interpreter */
     int objc,              /* number of arguments */
     Tcl_Obj *const objv[]) /* argument objects */
@@ -4309,10 +4321,10 @@ Itcl_BiInfoVariablesCmd(
  *  Returns a status TCL_OK/TCL_ERROR to indicate success/failure.
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 static int
 Itcl_BiInfoWidgetadaptorCmd(
-    TCL_UNUSED(ClientData), /* ItclObjectInfo Ptr */
+    TCL_UNUSED(void *),    /* ItclObjectInfo Ptr */
     Tcl_Interp *interp,    /* current interpreter */
     int objc,              /* number of arguments */
     Tcl_Obj *const objv[]) /* argument objects */
@@ -4337,25 +4349,25 @@ Itcl_BiInfoWidgetadaptorCmd(
      */
     contextIclsPtr = NULL;
     if (Itcl_GetContext(interp, &contextIclsPtr, &contextIoPtr) != TCL_OK) {
-        /* try it the hard way */
-	ClientData clientData;
-        ItclObjectInfo *infoPtr;
-        Tcl_Object oPtr;
+	/* try it the hard way */
+	void *clientData;
+	ItclObjectInfo *infoPtr;
+	Tcl_Object oPtr;
 	clientData = Itcl_GetCallFrameClientData(interp);
-        infoPtr = (ItclObjectInfo *)Tcl_GetAssocData(interp,
-                ITCL_INTERP_DATA, NULL);
+	infoPtr = (ItclObjectInfo *)Tcl_GetAssocData(interp,
+		ITCL_INTERP_DATA, NULL);
 	if (clientData != NULL) {
-            oPtr = Tcl_ObjectContextObject((Tcl_ObjectContext)clientData);
-            contextIoPtr = (ItclObject *)Tcl_ObjectGetMetadata(oPtr,
-	            infoPtr->object_meta_type);
-            contextIclsPtr = contextIoPtr->iclsPtr;
+	    oPtr = Tcl_ObjectContextObject((Tcl_ObjectContext)clientData);
+	    contextIoPtr = (ItclObject *)Tcl_ObjectGetMetadata(oPtr,
+		    infoPtr->object_meta_type);
+	    contextIclsPtr = contextIoPtr->iclsPtr;
 	}
 	if ((contextIoPtr == NULL) || (contextIclsPtr == NULL)) {
-            Tcl_SetObjResult(interp, Tcl_NewStringObj(
+	    Tcl_SetObjResult(interp, Tcl_NewStringObj(
 		    "\nget info like this instead: "
 		    "\n  namespace eval className { info widgetadaptor ... }", -1));
-            return TCL_ERROR;
-        }
+	    return TCL_ERROR;
+	}
     }
 
     /*
@@ -4396,10 +4408,10 @@ Itcl_BiInfoWidgetadaptorCmd(
  *  Returns a status TCL_OK/TCL_ERROR to indicate success/failure.
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 static int
 Itcl_BiInfoInstancesCmd(
-    ClientData clientData, /* ItclObjectInfo Ptr */
+    void *clientData,      /* ItclObjectInfo Ptr */
     Tcl_Interp *interp,    /* current interpreter */
     int objc,              /* number of arguments */
     Tcl_Obj *const objv[]) /* argument objects */
@@ -4415,40 +4427,40 @@ Itcl_BiInfoInstancesCmd(
     ItclShowArgs(1, "Itcl_BiInfoInstancesCmd", objc, objv);
     if (objc > 2) {
 	Tcl_AppendResult(interp,
-	        "wrong # args should be: info instances ?pattern?", NULL);
+		"wrong # args should be: info instances ?pattern?", NULL);
         return TCL_ERROR;
     }
     iclsPtr = NULL;
     pattern = NULL;
     if (Itcl_GetContext(interp, &iclsPtr, &ioPtr) != TCL_OK) {
-        Tcl_AppendResult(interp, "cannot get context ", NULL);
-        return TCL_ERROR;
+	Tcl_AppendResult(interp, "cannot get context ", NULL);
+	return TCL_ERROR;
     }
     if (ioPtr != NULL) {
-        iclsPtr = ioPtr->iclsPtr;
+	iclsPtr = ioPtr->iclsPtr;
     }
     if (objc == 2) {
-        pattern = Tcl_GetString(objv[1]);
+	pattern = Tcl_GetString(objv[1]);
     }
     infoPtr = (ItclObjectInfo *)clientData;
     listPtr = Tcl_NewListObj(0, NULL);
     FOREACH_HASH_VALUE(ioPtr, &infoPtr->objects) {
 	/* FIXME need to scan the inheritance too */
-        if (ioPtr->iclsPtr == iclsPtr) {
+	if (ioPtr->iclsPtr == iclsPtr) {
 	    if (ioPtr->iclsPtr->flags & ITCL_WIDGETADAPTOR) {
-	        objPtr = Tcl_NewStringObj(Tcl_GetCommandName(interp,
-		        ioPtr->accessCmd), -1);
+		objPtr = Tcl_NewStringObj(Tcl_GetCommandName(interp,
+		ioPtr->accessCmd), -1);
 	    } else {
-	        objPtr = Tcl_NewObj();
-	        Tcl_GetCommandFullName(interp, ioPtr->accessCmd, objPtr);
-            }
-	    if ((pattern == NULL) ||
-                     Tcl_StringCaseMatch(Tcl_GetString(objPtr), pattern, 0)) {
-	        Tcl_ListObjAppendElement(interp, listPtr, objPtr);
-	    } else {
-	        Tcl_DecrRefCount(objPtr);
+		objPtr = Tcl_NewObj();
+		Tcl_GetCommandFullName(interp, ioPtr->accessCmd, objPtr);
 	    }
-        }
+	    if ((pattern == NULL) ||
+		Tcl_StringCaseMatch(Tcl_GetString(objPtr), pattern, 0)) {
+		Tcl_ListObjAppendElement(interp, listPtr, objPtr);
+	    } else {
+		Tcl_DecrRefCount(objPtr);
+	    }
+	}
     }
     Tcl_SetObjResult(interp, listPtr);
     return TCL_OK;
@@ -4465,10 +4477,10 @@ Itcl_BiInfoInstancesCmd(
  *  Returns a status TCL_OK/TCL_ERROR to indicate success/failure.
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 static int
 Itcl_BiInfoDelegatedOptionsCmd(
-    TCL_UNUSED(ClientData), /* ItclObjectInfo Ptr */
+    TCL_UNUSED(void *),    /* ItclObjectInfo Ptr */
     Tcl_Interp *interp,    /* current interpreter */
     int objc,              /* number of arguments */
     Tcl_Obj *const objv[]) /* argument objects */
@@ -4536,10 +4548,10 @@ Itcl_BiInfoDelegatedOptionsCmd(
  *  Returns a status TCL_OK/TCL_ERROR to indicate success/failure.
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 static int
 Itcl_BiInfoDelegatedMethodsCmd(
-    TCL_UNUSED(ClientData), /* ItclObjectInfo Ptr */
+    TCL_UNUSED(void *),    /* ItclObjectInfo Ptr */
     Tcl_Interp *interp,    /* current interpreter */
     int objc,              /* number of arguments */
     Tcl_Obj *const objv[]) /* argument objects */
@@ -4609,10 +4621,10 @@ Itcl_BiInfoDelegatedMethodsCmd(
  *  Returns a status TCL_OK/TCL_ERROR to indicate success/failure.
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 static int
 Itcl_BiInfoDelegatedTypeMethodsCmd(
-    TCL_UNUSED(ClientData), /* ItclObjectInfo Ptr */
+    TCL_UNUSED(void *),    /* ItclObjectInfo Ptr */
     Tcl_Interp *interp,    /* current interpreter */
     int objc,              /* number of arguments */
     Tcl_Obj *const objv[]) /* argument objects */
@@ -4678,10 +4690,10 @@ Itcl_BiInfoDelegatedTypeMethodsCmd(
  *  the unknown handler for the ::itcl::builtin::Info::delagted ensemble
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 static int
 Itcl_BiInfoDelegatedUnknownCmd(
-    ClientData clientData,   /* ItclObjectInfo Ptr */
+    void *clientData,        /* ItclObjectInfo Ptr */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
     Tcl_Obj *const objv[])   /* argument objects */
@@ -4713,10 +4725,10 @@ Itcl_BiInfoDelegatedUnknownCmd(
  *  to indicate success/failure.
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 static int
 Itcl_BiInfoDelegatedOptionCmd(
-    TCL_UNUSED(ClientData), /* ItclObjectInfo Ptr */
+    TCL_UNUSED(void *),    /* ItclObjectInfo Ptr */
     Tcl_Interp *interp,    /* current interpreter */
     int objc,              /* number of arguments */
     Tcl_Obj *const objv[]) /* argument objects */
@@ -4947,10 +4959,10 @@ Itcl_BiInfoDelegatedOptionCmd(
  *  to indicate success/failure.
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 static int
 Itcl_BiInfoDelegatedMethodCmd(
-    TCL_UNUSED(ClientData), /* ItclObjectInfo Ptr */
+    TCL_UNUSED(void *),    /* ItclObjectInfo Ptr */
     Tcl_Interp *interp,    /* current interpreter */
     int objc,              /* number of arguments */
     Tcl_Obj *const objv[]) /* argument objects */
@@ -5171,10 +5183,10 @@ Itcl_BiInfoDelegatedMethodCmd(
  *  to indicate success/failure.
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 static int
 Itcl_BiInfoDelegatedTypeMethodCmd(
-    TCL_UNUSED(ClientData), /* ItclObjectInfo Ptr */
+    TCL_UNUSED(void *),    /* ItclObjectInfo Ptr */
     Tcl_Interp *interp,    /* current interpreter */
     int objc,              /* number of arguments */
     Tcl_Obj *const objv[]) /* argument objects */

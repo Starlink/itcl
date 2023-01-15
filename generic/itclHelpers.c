@@ -26,10 +26,10 @@ void
 ItclShowArgs(
     int level,
     const char *str,
-    int objc,
+    size_t objc,
     Tcl_Obj * const* objv)
 {
-    int i;
+    size_t i;
 
     if (level > _itcl_debug_level) {
         return;
@@ -77,24 +77,23 @@ int
 ItclCreateArgList(
     Tcl_Interp *interp,		/* interpreter managing this function */
     const char *str,		/* string representing argument list */
-    int *argcPtr,		/* number of mandatory arguments */
-    int *maxArgcPtr,		/* number of arguments parsed */
+    Tcl_Size *argcPtr,		/* number of mandatory arguments */
+    Tcl_Size *maxArgcPtr,		/* number of arguments parsed */
     Tcl_Obj **usagePtr,         /* store usage message for arguments here */
     ItclArgList **arglistPtrPtr,
     				/* returns pointer to parsed argument list */
-    ItclMemberFunc *dummy,
+    TCL_UNUSED(ItclMemberFunc *),
     const char *commandName)
 {
-    int argc;
-    int defaultArgc;
+    Tcl_Size argc;
+    Tcl_Size defaultArgc;
     const char **argv;
     const char **defaultArgv;
     ItclArgList *arglistPtr;
     ItclArgList *lastArglistPtr;
-    int i;
+    Tcl_Size i;
     int hadArgsArgument;
     int result;
-    (void)dummy;
 
     *arglistPtrPtr = NULL;
     lastArglistPtr = NULL;
@@ -130,7 +129,7 @@ ItclCreateArgList(
 			    "\" has argument with no name", NULL);
 		} else {
 		    char buf[TCL_INTEGER_SPACE];
-		    sprintf(buf, "%d", i);
+		    sprintf(buf, "%" ITCL_Z_MODIFIER "d", i);
 		    Tcl_AppendResult(interp, "argument #", buf,
 		            " has no name", NULL);
 		}
@@ -248,7 +247,7 @@ ItclDeleteArgList(
 int
 Itcl_EvalArgs(
     Tcl_Interp *interp,      /* current interpreter */
-    int objc,                /* number of arguments */
+    Tcl_Size objc,          /* number of arguments */
     Tcl_Obj *const objv[])   /* argument objects */
 {
     Tcl_Command cmd;
@@ -275,7 +274,12 @@ Itcl_EvalArgs(
      *  to pass in the proper client data.
      */
     Tcl_GetCommandInfoFromToken(cmd, &infoPtr);
-    return (infoPtr.objProc)(infoPtr.objClientData, interp, objc, objv);
+#if TCL_MAJOR_VERSION > 8
+    if (infoPtr.isNativeObjectProc == 2) {
+	return infoPtr.objProc2(infoPtr.objClientData2, interp, objc, objv);
+    }
+#endif
+    return infoPtr.objProc(infoPtr.objClientData, interp, objc, objv);
 }
 
 
@@ -297,14 +301,13 @@ Itcl_EvalArgs(
  */
 Tcl_Obj*
 Itcl_CreateArgs(
-    Tcl_Interp *dummy,      /* current interpreter */
+    TCL_UNUSED(Tcl_Interp *),/* current interpreter */
     const char *string,      /* first command word */
-    int objc,                /* number of arguments */
+    Tcl_Size objc,          /* number of arguments */
     Tcl_Obj *const objv[])   /* argument objects */
 {
-    int i;
+    Tcl_Size i;
     Tcl_Obj *listPtr;
-    (void)dummy;
 
     ItclShowArgs(1, "Itcl_CreateArgs", objc, objv);
     listPtr = Tcl_NewListObj(objc+2, NULL);
@@ -325,19 +328,16 @@ Itcl_CreateArgs(
 
 int
 ItclEnsembleSubCmd(
-    ClientData dummy,
+    TCL_UNUSED(void *),
     Tcl_Interp *interp,
-    const char *ensembleName,
+    TCL_UNUSED(const char *),
     int objc,
     Tcl_Obj *const *objv,
-    const char *functionName)
+    TCL_UNUSED(const char *))
 {
     int result;
     Tcl_Obj **newObjv;
     int isRootEnsemble;
-    (void)dummy;
-    (void)ensembleName;
-    (void)functionName;
 
     ItclShowArgs(2, functionName, objc, objv);
 

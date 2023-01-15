@@ -35,24 +35,24 @@
 /*
  *  FORWARD DECLARATIONS
  */
-static char* ItclTraceThisVar(ClientData cdata, Tcl_Interp *interp,
+static char* ItclTraceThisVar(void *cdata, Tcl_Interp *interp,
 	const char *name1, const char *name2, int flags);
-static char* ItclTraceTypeVar(ClientData cdata, Tcl_Interp *interp,
+static char* ItclTraceTypeVar(void *cdata, Tcl_Interp *interp,
 	const char *name1, const char *name2, int flags);
-static char* ItclTraceSelfVar(ClientData cdata, Tcl_Interp *interp,
+static char* ItclTraceSelfVar(void *cdata, Tcl_Interp *interp,
 	const char *name1, const char *name2, int flags);
-static char* ItclTraceSelfnsVar(ClientData cdata, Tcl_Interp *interp,
+static char* ItclTraceSelfnsVar(void *cdata, Tcl_Interp *interp,
 	const char *name1, const char *name2, int flags);
-static char* ItclTraceWinVar(ClientData cdata, Tcl_Interp *interp,
+static char* ItclTraceWinVar(void *cdata, Tcl_Interp *interp,
 	const char *name1, const char *name2, int flags);
-static char* ItclTraceOptionVar(ClientData cdata, Tcl_Interp *interp,
+static char* ItclTraceOptionVar(void *cdata, Tcl_Interp *interp,
 	const char *name1, const char *name2, int flags);
-static char* ItclTraceComponentVar(ClientData cdata, Tcl_Interp *interp,
+static char* ItclTraceComponentVar(void *cdata, Tcl_Interp *interp,
 	const char *name1, const char *name2, int flags);
-static char* ItclTraceItclHullVar(ClientData cdata, Tcl_Interp *interp,
+static char* ItclTraceItclHullVar(void *cdata, Tcl_Interp *interp,
 	const char *name1, const char *name2, int flags);
 
-static void ItclDestroyObject(ClientData clientData);
+static void ItclDestroyObject(void *clientData);
 static void FreeObject(char *cdata);
 
 static int ItclDestructBase(Tcl_Interp *interp, ItclObject *contextObj,
@@ -80,7 +80,7 @@ static ItclClass * GetClassFromClassName(Tcl_Interp *interp,
  */
 void
 ItclDeleteObjectMetadata(
-    ClientData clientData)
+    void *clientData)
 {
     ItclObject *ioPtr = (ItclObject *)clientData;
     Tcl_HashEntry *hPtr;
@@ -108,17 +108,14 @@ ItclDeleteObjectMetadata(
 
 static void
 ObjectRenamedTrace(
-    ClientData clientData,      /* The object being deleted. */
-    Tcl_Interp *dummy,         /* The interpreter containing the object. */
-    const char *oldName,        /* What the object was (last) called. */
+    void *clientData,           /* The object being deleted. */
+    TCL_UNUSED(Tcl_Interp *),   /* The interpreter containing the object. */
+    TCL_UNUSED(const char *),   /* What the object was (last) called. */
     const char *newName,        /* Always NULL ??. not for itk!! */
-    int flags)                  /* Why was the object deleted? */
+    TCL_UNUSED(int))            /* Why was the object deleted? */
 {
     ItclObject *ioPtr = (ItclObject *)clientData;
     Itcl_InterpState istate;
-    (void)dummy;
-    (void)oldName;
-    (void)flags;
 
     if (newName != NULL) {
 	/* FIXME should enter the new name in the hashtables for objects etc. */
@@ -152,7 +149,7 @@ Itcl_CreateObject(
     Tcl_Interp *interp,      /* interpreter mananging new object */
     const char* name,        /* name of new object */
     ItclClass *iclsPtr,      /* class for new object */
-    int objc,                /* number of arguments */
+    Tcl_Size objc,          /* number of arguments */
     Tcl_Obj *const objv[],   /* argument objects */
     ItclObject **rioPtr)     /* the created object */
 {
@@ -202,7 +199,7 @@ ItclCreateObject(
     Tcl_Interp *interp,      /* interpreter mananging new object */
     const char* name,        /* name of new object */
     ItclClass *iclsPtr,        /* class for new object */
-    int objc,                /* number of arguments */
+    size_t objc,                /* number of arguments */
     Tcl_Obj *const objv[])   /* argument objects */
 {
     int result = TCL_OK;
@@ -407,7 +404,7 @@ ItclCreateObject(
         do {
 	    Tcl_CmdInfo dummy;
 
-            sprintf(unique,"%.200s_%d", name, iclsPtr->unique++);
+            sprintf(unique,"%.200s_%" ITCL_Z_MODIFIER "u", name, iclsPtr->unique++);
             unique[0] = tolower(UCHAR(unique[0]));
 
             Tcl_DStringSetLength(&buffer, 0);
@@ -731,16 +728,11 @@ errorReturn:
  */
 static int
 ItclInitObjectCommands(
-   Tcl_Interp *interp,
-   ItclObject *ioPtr,
-   ItclClass *iclsPtr,
-   const char *name)
+   TCL_UNUSED(Tcl_Interp *),
+   TCL_UNUSED(ItclObject *),
+   TCL_UNUSED(ItclClass *),
+   TCL_UNUSED(const char *))
 {
-    (void)interp;
-    (void)ioPtr;
-    (void)iclsPtr;
-    (void)name;
-
     return TCL_OK;
 }
 
@@ -952,8 +944,8 @@ ItclInitObjectVariables(
 	              }
 	              if (ivPtr->arrayInitPtr != NULL) {
 			Tcl_DString buffer3;
-	                int i;
-	                int argc;
+	                Tcl_Size i;
+	                Tcl_Size argc;
 	                const char **argv;
 	                const char *val;
 
@@ -965,7 +957,7 @@ ItclInitObjectVariables(
 	                Tcl_SplitList(interp,
 			        Tcl_GetString(ivPtr->arrayInitPtr),
 	                        &argc, &argv);
-	                for (i = 0; i < argc; i++) {
+	                for (i = 0; i < argc; i += 2) {
                             val = Tcl_SetVar2(interp,
 			            Tcl_DStringValue(&buffer3), argv[i],
                                     argv[i + 1], TCL_NAMESPACE_ONLY);
@@ -976,7 +968,6 @@ ItclInitObjectVariables(
                                     NULL);
                                 return TCL_ERROR;
                             }
-	                    i++;
                         }
 			Tcl_DStringFree(&buffer3);
 		        ckfree((char *)argv);
@@ -1158,10 +1149,10 @@ ItclInitObjectOptions(
  */
 int
 ItclInitObjectMethodVariables(
-   Tcl_Interp *dummy,
+   TCL_UNUSED(Tcl_Interp *),
    ItclObject *ioPtr,
    ItclClass *iclsPtr,
-   const char *name)
+   TCL_UNUSED(const char *))
 {
     ItclClass *iclsPtr2;
     ItclHierIter hier;
@@ -1170,8 +1161,6 @@ ItclInitObjectMethodVariables(
     Tcl_HashEntry *hPtr2;
     Tcl_HashSearch place;
     int isNew;
-    (void)dummy;
-    (void)name;
 
     imvPtr = NULL;
     Itcl_InitHierIter(&hier, iclsPtr);
@@ -1289,7 +1278,7 @@ ItclDeleteObjectVariablesNamespace(
 
 static int
 FinalizeDeleteObject(
-    ClientData data[],
+    void *data[],
     Tcl_Interp *interp,
     int result)
 {
@@ -1307,7 +1296,7 @@ FinalizeDeleteObject(
 
 static int
 CallDestructBase(
-    ClientData data[],
+    void *data[],
     Tcl_Interp *interp,
     int result)
 {
@@ -1933,7 +1922,7 @@ void
 ItclReportObjectUsage(
     Tcl_Interp *interp,           /* current interpreter */
     ItclObject *contextIoPtr,     /* current object */
-    Tcl_Namespace *callerNsPtr,
+    TCL_UNUSED(Tcl_Namespace *),
     Tcl_Namespace *contextNsPtr)  /* the context namespace */
 {
     Tcl_Obj *namePtr;
@@ -1950,7 +1939,6 @@ ItclReportObjectUsage(
     char *name;
     int ignore;
     int cmp;
-    (void)callerNsPtr;
 
     if (contextIoPtr == NULL) {
         resultPtr = Tcl_GetObjResult(interp);
@@ -2080,19 +2068,18 @@ ItclReportObjectUsage(
  *  the "this" variable cannot be set.
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 static char*
 ItclTraceThisVar(
-    ClientData cdata,	  /* object instance data */
+    void *cdata,	      /* object instance data */
     Tcl_Interp *interp,	  /* interpreter managing this variable */
     const char *name1,    /* variable name */
-    const char *name2,    /* unused */
-    int flags)		    /* flags indicating read/write */
+    TCL_UNUSED(const char *),/* unused */
+    int flags)		      /* flags indicating read/write */
 {
     ItclObject *contextIoPtr = (ItclObject*)cdata;
     Tcl_Obj *objPtr;
     const char *objName;
-    (void)name2;
 
     /* because of SF bug #187 use a different trace handler for "this", "win", "type"
      * *self" and "selfns"
@@ -2138,14 +2125,14 @@ ItclTraceThisVar(
  *  the "win" variable cannot be set.
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 static char*
 ItclTraceWinVar(
-    ClientData cdata,	  /* object instance data */
+    void *cdata,          /* object instance data */
     Tcl_Interp *interp,	  /* interpreter managing this variable */
     const char *name1,    /* variable name */
-    const char *name2,    /* unused */
-    int flags)		    /* flags indicating read/write */
+    TCL_UNUSED(const char *),/* unused */
+    int flags)            /* flags indicating read/write */
 {
     ItclObject *contextIoPtr = (ItclObject*)cdata;
     Tcl_DString buffer;
@@ -2153,7 +2140,6 @@ ItclTraceWinVar(
     const char *objName;
     const char *head;
     const char *tail;
-    (void)name2;
 
     /*
      *  Handle read traces on "win"
@@ -2199,19 +2185,18 @@ ItclTraceWinVar(
  *  the "type" variable cannot be set.
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 static char*
 ItclTraceTypeVar(
-    ClientData cdata,	  /* object instance data */
+    void *cdata,          /* object instance data */
     Tcl_Interp *interp,	  /* interpreter managing this variable */
     const char *name1,    /* variable name */
-    const char *name2,    /* unused */
-    int flags)		    /* flags indicating read/write */
+    TCL_UNUSED(const char *),/* unused */
+    int flags)            /* flags indicating read/write */
 {
     ItclObject *contextIoPtr = (ItclObject*)cdata;
     Tcl_Obj *objPtr;
     const char *objName;
-    (void)name2;
 
     /*
      *  Handle read traces on "type"
@@ -2251,19 +2236,18 @@ ItclTraceTypeVar(
  *  the "self" variable cannot be set.
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 static char*
 ItclTraceSelfVar(
-    ClientData cdata,	  /* object instance data */
+    void *cdata,          /* object instance data */
     Tcl_Interp *interp,	  /* interpreter managing this variable */
     const char *name1,    /* variable name */
-    const char *name2,    /* unused */
-    int flags)		    /* flags indicating read/write */
+    TCL_UNUSED(const char *),/* unused */
+    int flags)            /* flags indicating read/write */
 {
     ItclObject *contextIoPtr = (ItclObject*)cdata;
     Tcl_Obj *objPtr;
     const char *objName;
-    (void)name2;
 
     /*
      *  Handle read traces on "self"
@@ -2319,19 +2303,18 @@ ItclTraceSelfVar(
  *  the "selfns" variable cannot be set.
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 static char*
 ItclTraceSelfnsVar(
-    ClientData cdata,	  /* object instance data */
+    void *cdata,          /* object instance data */
     Tcl_Interp *interp,	  /* interpreter managing this variable */
     const char *name1,    /* variable name */
-    const char *name2,    /* unused */
+    TCL_UNUSED(const char *),/* unused */
     int flags)	          /* flags indicating read/write */
 {
     ItclObject *contextIoPtr = (ItclObject*)cdata;
     Tcl_Obj *objPtr;
     const char *objName;
-    (void)name2;
 
     /*
      *  Handle read traces on "selfns"
@@ -2368,20 +2351,17 @@ ItclTraceSelfnsVar(
  *  or validateMethodPtr and calls it
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 static char*
 ItclTraceOptionVar(
-    ClientData cdata,	    /* object instance data */
-    Tcl_Interp *interp,	    /* interpreter managing this variable */
-    const char *name1,      /* variable name */
-    const char *name2,      /* unused */
-    int flags)		    /* flags indicating read/write */
+    void *cdata,            /* object instance data */
+    TCL_UNUSED(Tcl_Interp *),/* interpreter managing this variable */
+    TCL_UNUSED(const char *),/* variable name */
+    TCL_UNUSED(const char *),/* unused */
+    int flags)              /* flags indicating read/write */
 {
     ItclObject *ioPtr;
     ItclOption *ioptPtr;
-    (void)interp;
-    (void)name1;
-    (void)name2;
 
 /* FIXME !!! */
 /* don't know yet if ItclTraceOptionVar is really needed !! */
@@ -2419,14 +2399,14 @@ ItclTraceOptionVar(
  *
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 static char*
 ItclTraceComponentVar(
-    ClientData cdata,	    /* object instance data */
+    void *cdata,            /* object instance data */
     Tcl_Interp *interp,	    /* interpreter managing this variable */
     const char *name1,      /* variable name */
-    const char *name2,      /* unused */
-    int flags)		    /* flags indicating read/write */
+    TCL_UNUSED(const char *),/* unused */
+    int flags)              /* flags indicating read/write */
 {
     FOREACH_HASH_DECLS;
     Tcl_HashEntry *hPtr2;
@@ -2438,7 +2418,6 @@ ItclTraceComponentVar(
     ItclComponent *icPtr;
     ItclDelegatedFunction *idmPtr;
     const char *val;
-    (void)name2;
 
 /* FIXME should free memory on unset or rename!! */
     if (cdata != NULL) {
@@ -2522,21 +2501,20 @@ ItclTraceComponentVar(
  *  after the first initialization
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 static char*
 ItclTraceItclHullVar(
-    ClientData cdata,	    /* object instance data */
+    void *cdata,            /* object instance data */
     Tcl_Interp *interp,	    /* interpreter managing this variable */
     const char *name1,      /* variable name */
-    const char *name2,      /* unused */
-    int flags)		    /* flags indicating read/write */
+    TCL_UNUSED(const char *),/* unused */
+    int flags)              /* flags indicating read/write */
 {
     Tcl_HashEntry *hPtr;
     Tcl_Obj *objPtr;
     ItclObjectInfo *infoPtr;
     ItclObject *ioPtr;
     ItclVariable *ivPtr;
-    (void)name2;
 
 /* FIXME !!! */
 /* FIXME should free memory on unset or rename!! */
@@ -2604,7 +2582,7 @@ ItclTraceItclHullVar(
  */
 static void
 ItclDestroyObject(
-    ClientData cdata)  /* object instance data */
+    void *cdata)  /* object instance data */
 {
     ItclObject *contextIoPtr = (ItclObject*)cdata;
     Tcl_HashEntry *hPtr;
@@ -2733,14 +2711,14 @@ FreeObject(
 
 static int
 CallPublicObjectCmd(
-    ClientData data[],
+    void *data[],
     Tcl_Interp *interp,
     int result)
 {
     Tcl_Object *oPtr = (Tcl_Object *)data[0];
     Tcl_Class clsPtr = (Tcl_Class)data[1];
     Tcl_Obj *const *objv = (Tcl_Obj *const *)data[3];
-    int objc = PTR2INT(data[2]);
+    size_t objc = PTR2INT(data[2]);
 
     ItclShowArgs(1, "CallPublicObjectCmd", objc, objv);
     result = Itcl_PublicObjectCmd(oPtr, interp, clsPtr, objc, objv);
@@ -2750,11 +2728,11 @@ CallPublicObjectCmd(
 
 int
 ItclObjectCmd(
-    ClientData clientData,
+    void *clientData,
     Tcl_Interp *interp,
     Tcl_Object oPtr,
     Tcl_Class clsPtr,
-    int objc,
+    size_t objc,
     Tcl_Obj *const *objv)
 {
     Tcl_Obj *methodNamePtr;
@@ -3181,8 +3159,8 @@ ExpandDelegateAs(
     Tcl_Obj *objPtr;
     const char **argv;
     const char *val;
-    int argc;
-    int j;
+    Tcl_Size argc;
+    Tcl_Size j;
 
 
     if (idmPtr->icPtr == NULL) {
@@ -3458,7 +3436,7 @@ DelegateFunction(
 
 int
 DelegatedOptionsInstall(
-    Tcl_Interp *dummy,
+    TCL_UNUSED(Tcl_Interp *),
     ItclClass *iclsPtr)
 {
     Tcl_HashEntry *hPtr2;
@@ -3467,7 +3445,6 @@ DelegatedOptionsInstall(
     ItclOption *ioptPtr;
     FOREACH_HASH_DECLS;
     char *optionName;
-    (void)dummy;
 
     FOREACH_HASH_VALUE(idoPtr, &iclsPtr->delegatedOptions) {
 	optionName = Tcl_GetString(idoPtr->namePtr);

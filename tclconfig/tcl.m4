@@ -53,6 +53,10 @@ AC_DEFUN([TEA_PATH_TCLCONFIG], [
 	    AS_HELP_STRING([--with-tcl],
 		[directory containing tcl configuration (tclConfig.sh)]),
 	    [with_tclconfig="${withval}"])
+	AC_ARG_WITH(tcl8,
+	    AS_HELP_STRING([--with-tcl8],
+		[Compile for Tcl8 in Tcl9 environment]),
+	    [with_tcl8="${withval}"])
 	AC_MSG_CHECKING([for Tcl configuration])
 	AC_CACHE_VAL(ac_cv_c_tclconfig,[
 
@@ -1167,6 +1171,9 @@ AC_DEFUN([TEA_CONFIG_CFLAGS], [
 		    amd64|x64|yes)
 			MACHINE="AMD64" ; # default to AMD64 64-bit build
 			;;
+		    arm64|aarch64)
+			MACHINE="ARM64"
+			;;
 		    ia64)
 			MACHINE="IA64"
 			;;
@@ -1235,6 +1242,13 @@ AC_DEFUN([TEA_CONFIG_CFLAGS], [
 				AR="x86_64-w64-mingw32-ar"
 				RANLIB="x86_64-w64-mingw32-ranlib"
 				RC="x86_64-w64-mingw32-windres"
+			    ;;
+			    arm64|aarch64)
+				CC="aarch64-w64-mingw32-clang"
+				LD="aarch64-w64-mingw32-ld"
+				AR="aarch64-w64-mingw32-ar"
+				RANLIB="aarch64-w64-mingw32-ranlib"
+				RC="aarch64-w64-mingw32-windres"
 			    ;;
 			    *)
 				CC="i686-w64-mingw32-${CC}"
@@ -2353,7 +2367,8 @@ AC_DEFUN([TEA_TIME_HANDLER], [
     # (like convex) have timezone functions, etc.
     #
     AC_CACHE_CHECK([long timezone variable], tcl_cv_timezone_long, [
-	AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <time.h>]],
+	AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <time.h>
+#include <stdlib.h>]],
 	[[extern long timezone;
 	    timezone += 1;
 	    exit (0);]])],
@@ -2365,7 +2380,8 @@ AC_DEFUN([TEA_TIME_HANDLER], [
 	# On some systems (eg IRIX 6.2), timezone is a time_t and not a long.
 	#
 	AC_CACHE_CHECK([time_t timezone variable], tcl_cv_timezone_time, [
-	    AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <time.h>]],
+	    AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <time.h>
+#include <stdlib.h>]],
 	    [[extern time_t timezone;
 		timezone += 1;
 		exit (0);]])],
@@ -3162,10 +3178,11 @@ print("manifest needed")
 
     PACKAGE_LIB_PREFIX8="${PACKAGE_LIB_PREFIX}"
     PACKAGE_LIB_PREFIX9="${PACKAGE_LIB_PREFIX}tcl9"
-    if test "${TCL_MAJOR_VERSION}" -gt 8 ; then
+    if test "${TCL_MAJOR_VERSION}" -gt 8 -a x"${with_tcl8}" == x; then
 	PACKAGE_LIB_PREFIX="${PACKAGE_LIB_PREFIX9}"
     else
 	PACKAGE_LIB_PREFIX="${PACKAGE_LIB_PREFIX8}"
+	AC_DEFINE(TCL_MAJOR_VERSION, 8, [Compile for Tcl8?])
     fi
     if test "${TEA_PLATFORM}" = "windows" ; then
 	if test "${SHARED_BUILD}" = "1" ; then
