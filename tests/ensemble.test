@@ -210,5 +210,16 @@ test ensemble-3.1a {the error handler part shows up as generic "...and"
 
 ::itcl::delete ensemble test_numbers
 
+test ensemble-4.0 {SF Bug 119} -setup {
+    itcl::ensemble foo part sub {} {error bar}
+} -cleanup {
+    unset -nocomplain m o
+    rename foo {}
+} -body {
+    catch {foo sub} m o
+    dict get $o -errorinfo
+} -match glob -result {*itcl ensemble part*}
+
+
 ::tcltest::cleanupTests
 return
