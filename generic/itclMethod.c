@@ -64,7 +64,7 @@ static void FreeMemberCode(ItclMemberCode *mcodePtr);
  */
 static int
 NRBodyCmd(
-    ClientData clientData,   /*  */
+    TCL_UNUSED(ClientData),   /*  */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
     Tcl_Obj *const *objv)    /* argument objects */
@@ -189,7 +189,7 @@ Itcl_BodyCmd(
 /* ARGSUSED */
 static int
 NRConfigBodyCmd(
-    ClientData dummy,        /* unused */
+    TCL_UNUSED(ClientData),        /* unused */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
     Tcl_Obj *const objv[])   /* argument objects */
@@ -1319,7 +1319,7 @@ Itcl_EvalMemberCode(
 
 static int
 EquivArgLists(
-    Tcl_Interp *interp,
+    TCL_UNUSED(Tcl_Interp*),
     ItclArgList *origArgs,
     ItclArgList *realArgs)
 {
@@ -2056,10 +2056,10 @@ Itcl_InvokeMethodIfExists(
  */
 int
 Itcl_ReportFuncErrors(
-    Tcl_Interp* interp,        /* interpreter being modified */
-    ItclMemberFunc *imPtr,     /* command member that was invoked */
-    ItclObject *contextObj,    /* object context for this command */
-    int result)                /* integer status code from proc body */
+    TCL_UNUSED(Tcl_Interp*),     /* interpreter being modified */
+    TCL_UNUSED(ItclMemberFunc*), /* command member that was invoked */
+    TCL_UNUSED(ItclObject*),     /* object context for this command */
+    int result)                 /* integer status code from proc body */
 {
 /* FIXME !!! */
 /* adapt to use of ItclProcErrorProc for stubs compatibility !! */
@@ -2189,7 +2189,7 @@ Itcl_CmdAliasProc(
  */
 Tcl_Var
 Itcl_VarAliasProc(
-    Tcl_Interp *interp,
+    TCL_UNUSED(Tcl_Interp*),
     Tcl_Namespace *nsPtr,
     const char *varName,
     ClientData clientData)
@@ -2266,8 +2266,8 @@ int
 ItclCheckCallProc(
     ClientData clientData,
     Tcl_Interp *interp,
-    Tcl_ObjectContext contextPtr,
-    Tcl_CallFrame *framePtr,
+    TCL_UNUSED(Tcl_ObjectContext),
+    TCL_UNUSED(Tcl_CallFrame*),
     int *isFinished)
 {
     int result;
@@ -2456,8 +2456,8 @@ ItclCheckCallMethod(
     Itcl_PushStack(framePtr, stackPtr);
 
     if (ioPtr != NULL) {
-        ioPtr->callRefCount++;
-	Itcl_PreserveData(ioPtr);
+	ioPtr->callRefCount++;
+	Itcl_PreserveData(ioPtr); /* ++ preserve until ItclAfterCallMethod releases it */
     }
     imPtr->iclsPtr->callRefCount++;
     if (!imPtr->iclsPtr->infoPtr->useOldResolvers) {
@@ -2486,7 +2486,7 @@ ItclAfterCallMethod(
     ClientData clientData,
     Tcl_Interp *interp,
     Tcl_ObjectContext contextPtr,
-    Tcl_Namespace *nsPtr,
+    TCL_UNUSED(Tcl_Namespace*),
     int call_result)
 {
     Tcl_HashEntry *hPtr;
@@ -2571,10 +2571,13 @@ ItclAfterCallMethod(
             if (hPtr == NULL) {
                 ckfree((char *)callContextPtr);
 	    }
-	    Itcl_ReleaseData(ioPtr);
         } else {
             ckfree((char *)callContextPtr);
         }
+    }
+
+    if (ioPtr != NULL) {
+	Itcl_ReleaseData(ioPtr); /* -- paired release for preserve in ItclCheckCallMethod */
     }
     result = call_result;
 finishReturn:
@@ -2585,7 +2588,7 @@ finishReturn:
 void
 ItclProcErrorProc(
     Tcl_Interp *interp,
-    Tcl_Obj *procNameObj)
+    TCL_UNUSED(Tcl_Obj*))
 {
     Tcl_Obj *objPtr;
     Tcl_HashEntry *hPtr;

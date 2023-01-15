@@ -114,12 +114,12 @@ test basic-1.6 {objects have an access command
     namespace which -command x
 } -cleanup $cleanup2 -result ::x
 
-test basic-1.7a {objects are added to the master list
+test basic-1.7a {objects are added to the global list
 } -setup $setup2 -body {
     itcl::find objects x
 } -cleanup $cleanup2 -result x
 
-test basic-1.7b {objects are added to the master list
+test basic-1.7b {objects are added to the global list
 } -setup $setup2 -body {
     itcl::find objects -class Counter x
 } -cleanup $cleanup2 -result x
@@ -194,6 +194,20 @@ test basic-1.20 {
 } -cleanup {
     ::itcl::delete class \u6210bcd
 } -result {bar}
+
+test basic-1.21 {error on empty class name
+} -body {
+    itcl::class {} {}
+} -returnCodes error -result {invalid class name ""}
+
+test basic-1.22 {error on empty object name
+} -setup {
+    itcl::class ::A {}
+} -body {
+    ::A {}
+} -cleanup {
+    ::itcl::delete class ::A
+} -returnCodes error -result {object name must not be empty}
 
 # ----------------------------------------------------------------------
 #  #auto names

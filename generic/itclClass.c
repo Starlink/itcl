@@ -57,11 +57,13 @@ ItclReleaseClass(
 {
     ItclClass *iclsPtr = (ItclClass *)clientData;
 
+    assert(iclsPtr->refCount != 0);
     if (iclsPtr->refCount-- <= 1) {
 	ItclFreeClass((char *) clientData);
     }
 }
-
+
+
 /*
  * ------------------------------------------------------------------------
  *  Itcl_DeleteMemberFunc()
@@ -133,7 +135,6 @@ ItclDeleteClassMetadata(
     } else {
 	ItclDestroyClass2(iclsPtr);
     }
-    ItclReleaseClass(iclsPtr);
 }
 
 static int
@@ -146,6 +147,7 @@ CallNewObjectInstance(
     const char *path = (const char *)data[1];
     Tcl_Object *oPtr = (Tcl_Object *)data[2];
     Tcl_Obj *nameObjPtr = (Tcl_Obj *)data[3];
+    (void)result;
 
     *oPtr = NULL;
     if (infoPtr->clazzClassPtr) {
@@ -566,6 +568,8 @@ ItclDeleteClassVariablesNamespace(
     Tcl_Interp *interp,
     ItclClass *iclsPtr)
 {
+    (void)interp;
+    (void)iclsPtr;
     /* TODO: why is this being skipped? */
     return;
 }
@@ -1588,6 +1592,11 @@ ItclClassCreateObject(
     if (objName == NULL) {
         objName = token;
     }
+    if (*objName == '\0') {
+        Tcl_AppendResult(interp, "object name must not be empty", NULL);
+        Tcl_SetErrorCode(interp, "TCL", "OO", "EMPTY_NAME", NULL);
+        return TCL_ERROR;
+    }
 
     /*
      *  Try to create a new object.  If successful, return the
@@ -1635,7 +1644,7 @@ ItclResolveVarEntry(
 	Tcl_Obj *vnObjPtr;
 	int newEntry, processAncestors;
 	size_t varLen;
-      
+
 	/* (de)qualify to simple name */
 	varName = simpleName = lookupName;
 	while(*varName) {
@@ -1644,7 +1653,7 @@ ItclResolveVarEntry(
 	    };
 	}
 	vnObjPtr = Tcl_NewStringObj(simpleName, -1);
-	
+
 	processAncestors = simpleName != lookupName;
 
 	Tcl_DStringInit(&buffer);
@@ -1707,7 +1716,7 @@ ItclResolveVarEntry(
 			    }
 			    /* check leastQualName correction needed */
 			    if (!vlookup->leastQualName) {
-				vlookup->leastQualName = 
+				vlookup->leastQualName = (char *)
 				    Tcl_GetHashKey(&iclsPtr->resolveVars, hPtr);
 			    }
 			    /* reset vlookup for full-qualified names - new lookup */
@@ -1725,7 +1734,7 @@ ItclResolveVarEntry(
 			setResVar:
 
 			    vlookup->ivPtr = ivPtr;
-			    vlookup->leastQualName = 
+			    vlookup->leastQualName = (char *)
 				Tcl_GetHashKey(&iclsPtr->resolveVars, hPtr);
 
 			    /*
@@ -1859,7 +1868,7 @@ Itcl_BuildVirtualTables(
         if (hPtr == NULL) {
             break;
         }
-        clookupPtr = Tcl_GetHashValue(hPtr);
+        clookupPtr = (ItclCmdLookup *)Tcl_GetHashValue(hPtr);
         ckfree((char *)clookupPtr);
 	Tcl_DeleteHashEntry(hPtr);
     }

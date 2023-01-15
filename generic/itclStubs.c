@@ -62,7 +62,7 @@ Itcl_IsStub(
  */
 int
 Itcl_StubCreateCmd(
-    ClientData clientData,   /* not used */
+    TCL_UNUSED(ClientData),   /* not used */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
     Tcl_Obj *const objv[])   /* argument objects */
@@ -112,7 +112,7 @@ Itcl_StubCreateCmd(
  */
 int
 Itcl_StubExistsCmd(
-    ClientData clientData,   /* not used */
+    TCL_UNUSED(ClientData),   /* not used */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
     Tcl_Obj *const objv[])   /* argument objects */
@@ -224,7 +224,7 @@ ItclHandleStubCmd(
 /* ARGSUSED */
 static void
 ItclDeleteStub(
-    ClientData cdata)      /* not used */
+    TCL_UNUSED(ClientData))      /* not used */
 {
     /* do nothing */
 }

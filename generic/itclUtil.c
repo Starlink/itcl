@@ -628,7 +628,7 @@ Itcl_ReleaseData(
     /* Free cdata now */
     freeProc = blk->freeProc;
     blk->freeProc = NULL;
-    freeProc(cdata);
+    freeProc((char *)cdata);
 }
 
 /*
@@ -674,7 +674,7 @@ void * Itcl_Alloc(
  */
 void Itcl_Free(void *ptr) {
     PresMemoryPrefix *blk;
-    
+
     if (ptr == NULL) {
 	return;
     }
