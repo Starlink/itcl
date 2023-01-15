@@ -375,6 +375,7 @@ ItclCreateMethod(
         Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
             "bad method name \"", Tcl_GetString(namePtr), "\"",
             (char*)NULL);
+	Tcl_DecrRefCount(namePtr);
         return TCL_ERROR;
     }
 
@@ -479,7 +480,7 @@ ItclCreateMemberFunc(
      *  same name doesn't already exist.
      */
     hPtr = Tcl_CreateHashEntry(&iclsPtr->functions, (char *)namePtr, &newEntry);
-    if (!hPtr) {
+    if (!newEntry) {
         Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
             "\"", Tcl_GetString(namePtr), "\" already defined in class \"",
             Tcl_GetString(iclsPtr->fullNamePtr), "\"",
@@ -1421,13 +1422,24 @@ Itcl_GetContext(
 {
     Tcl_Namespace *activeNs = Tcl_GetCurrentNamespace(interp);
     Tcl_HashEntry *hPtr;
-    ItclCallContext *callContextPtr;
-    ItclObjectInfo *infoPtr;
+    ItclObjectInfo *infoPtr = (ItclObjectInfo *)Tcl_GetAssocData(interp,
+            ITCL_INTERP_DATA, NULL);
+    ItclCallContext *callContextPtr = Itcl_PeekStack(&infoPtr->contextStack);
 
     /*
      *  Return NULL for anything that cannot be found.
      */
     *ioPtrPtr = NULL;
+
+    if (callContextPtr
+	    && (callContextPtr->objectFlags & ITCL_OBJECT_ROOT_METHOD)) {
+	ItclObject *ioPtr = callContextPtr->ioPtr;
+
+	assert(ioPtr);
+	*ioPtrPtr = ioPtr;
+	*iclsPtrPtr = ioPtr->iclsPtr;
+	return TCL_OK;
+    }
 
     if (!Itcl_IsClassNamespace(activeNs)) {
         /*
@@ -1444,9 +1456,6 @@ Itcl_GetContext(
      *  all known info.  See if the current call frame is a known
      *  object context, and if so, return that context.
      */
-    infoPtr = (ItclObjectInfo *)Tcl_GetAssocData(interp,
-            ITCL_INTERP_DATA, NULL);
-    callContextPtr = Itcl_PeekStack(&infoPtr->contextStack);
     if ((callContextPtr != NULL) && (callContextPtr->imPtr != NULL)) {
         *iclsPtrPtr = callContextPtr->imPtr->iclsPtr;
     } else {
@@ -1808,9 +1817,7 @@ int
 Itcl_ConstructBase(
     Tcl_Interp *interp,       /* interpreter */
     ItclObject *contextObj,   /* object being constructed */
-    ItclClass *contextClass,  /* current class being constructed */
-    int objc,
-    Tcl_Obj *const *objv)
+    ItclClass *contextClass)  /* current class being constructed */
 {
     int result = TCL_OK;
     Tcl_Obj *objPtr;
@@ -1857,7 +1864,7 @@ Itcl_ConstructBase(
 	            contextObj, INT2PTR(0), NULL);
             result = Itcl_NRRunCallbacks(interp, callbackPtr);
 	} else {
-            result = Itcl_ConstructBase(interp, contextObj, iclsPtr, objc, objv);
+            result = Itcl_ConstructBase(interp, contextObj, iclsPtr);
         }
     }
     Tcl_DecrRefCount(objPtr);
@@ -1874,7 +1881,7 @@ ItclConstructGuts(
     ItclClass *contextClass;
 
     /* Ignore syntax error */
-    if (objc != 4) {
+    if (objc != 3) {
 	return TCL_OK;
     }
 
@@ -1883,13 +1890,13 @@ ItclConstructGuts(
 	return TCL_OK;
     }
 
-    contextClass = Itcl_FindClass(interp, Tcl_GetString(objv[3]), 0);
+    contextClass = Itcl_FindClass(interp, Tcl_GetString(objv[2]), 0);
     if (contextClass == NULL) {
 	return TCL_OK;
     }
 
 
-    return Itcl_ConstructBase(interp, contextObj, contextClass, objc, objv);
+    return Itcl_ConstructBase(interp, contextObj, contextClass);
 }
 
 /*
@@ -2286,9 +2293,6 @@ ItclCheckCallMethod(
     hPtr = NULL;
     imPtr = (ItclMemberFunc *)clientData;
     ItclPreserveIMF(imPtr);
-    if (imPtr->codePtr != NULL) {
-        Itcl_PreserveData(imPtr->codePtr);
-    }
     if (imPtr->flags & ITCL_CONSTRUCTOR) {
         ioPtr = imPtr->iclsPtr->infoPtr->currIoPtr;
     } else {
@@ -2407,9 +2411,6 @@ ItclCheckCallMethod(
     }
     return result;
 finishReturn:
-    if (imPtr->codePtr != NULL) {
-        Itcl_ReleaseData(imPtr->codePtr);
-    }
     ItclReleaseIMF(imPtr);
     return result;
 }
@@ -2462,6 +2463,7 @@ ItclAfterCallMethod(
      */
     ioPtr = callContextPtr->ioPtr;
     if (ioPtr != NULL) {
+      if (imPtr->iclsPtr) {
         imPtr->iclsPtr->callRefCount--;
         if (imPtr->flags & (ITCL_CONSTRUCTOR | ITCL_DESTRUCTOR)) {
             if ((imPtr->flags & ITCL_DESTRUCTOR) && ioPtr &&
@@ -2475,6 +2477,7 @@ ItclAfterCallMethod(
                     (char *)imPtr->iclsPtr->namePtr, &newEntry);
             }
         }
+      }
         ioPtr->callRefCount--;
         if (ioPtr->flags & ITCL_OBJECT_SHOULD_VARNS_DELETE) {
             ItclDeleteObjectVariablesNamespace(interp, ioPtr);
@@ -2496,9 +2499,6 @@ ItclAfterCallMethod(
     }
     result = call_result;
 finishReturn:
-    if (imPtr->codePtr != NULL) {
-        Itcl_ReleaseData(imPtr->codePtr);
-    }
     ItclReleaseIMF(imPtr);
     return result;
 }

@@ -327,7 +327,7 @@ test info-4.1a {query class (wrong # args)} {
 
 test info-4.1b {query most-specific class} {
     list [ti info class] [ti do info class]
-} {::test_info ::test_info}
+} {test_info ::test_info}
 
 test info-4.2a {query inheritance info (wrong # args)} {
     list [catch {ti info inherit x} result] $result
@@ -335,7 +335,7 @@ test info-4.2a {query inheritance info (wrong # args)} {
 
 test info-4.2b {query inheritance info} {
     list [ti info inherit] [ti do info inherit]
-} {::test_info_base {}}
+} {test_info_base {}}
 
 test info-4.2c {query inheritance info} {
     ti do ti info inherit
@@ -347,7 +347,7 @@ test info-4.3a {query heritage info (wrong # args)} {
 
 test info-4.3b {query heritage info} {
     list [ti info heritage] [ti do info heritage]
-} {{::test_info ::test_info_base} ::test_info_base}
+} {{test_info test_info_base} ::test_info_base}
 
 test info-4.3c {query heritage info} {
     ti do ti info heritage
@@ -398,6 +398,17 @@ test info-5.1 {info vars} {
 test info-5.2 {info exists} {
     list [ti do info exists args] [ti do info exists xyzzy]
 } {1 0}
+
+test info-6.0 {Bug a03f579f7d} -setup {
+    # Must not segfault
+    itcl::class C {
+	proc p {} {info vars}
+    }
+} -body {
+    C::p
+} -cleanup {
+    itcl::delete class C
+} -result {}
 
 # ----------------------------------------------------------------------
 #  Clean up

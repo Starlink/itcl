@@ -509,7 +509,7 @@ ItclCreateObject(
      */
     objPtr = Tcl_NewStringObj("constructor", -1);
     if (Tcl_FindHashEntry(&iclsPtr->functions, (char *)objPtr) == NULL) {
-        result = Itcl_ConstructBase(interp, ioPtr, iclsPtr, objc, objv);
+        result = Itcl_ConstructBase(interp, ioPtr, iclsPtr);
     }
     Tcl_DecrRefCount(objPtr);
 
@@ -3307,6 +3307,7 @@ ExpandDelegateAs(
             Tcl_ListObjAppendElement(interp, listPtr,
                     Tcl_NewStringObj(argv[j], -1));
         }
+	ckfree((char *)argv);
     } else {
 	if (idmPtr->usingPtr != NULL) {
 	    char *cp;
