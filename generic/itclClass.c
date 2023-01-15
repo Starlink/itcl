@@ -970,10 +970,10 @@ ItclDestroyClassNamesp(
         if (ioPtr->iclsPtr == iclsPtr) {
 	    if ((ioPtr->accessCmd != NULL) && (!(ioPtr->flags &
 	            (ITCL_OBJECT_IS_DESTRUCTED)))) {
-		Itcl_PreserveData(ioPtr);
+		ItclPreserveObject(ioPtr);
                 Tcl_DeleteCommandFromToken(iclsPtr->interp, ioPtr->accessCmd);
 	        ioPtr->accessCmd = NULL;
-		Itcl_ReleaseData(ioPtr);
+		ItclReleaseObject(ioPtr);
 	        /*
 	         * Fix 227804: Whenever an object to delete was found we
 	         * have to reset the search to the beginning as the
@@ -1277,16 +1277,8 @@ int
 Itcl_IsClassNamespace(
     Tcl_Namespace *nsPtr)  /* namespace being tested */
 {
-    if (nsPtr == NULL) {
-	return 0;
-    }
-    if (nsPtr->deleteProc == NULL) {
-	return 0;
-    }
-    if (nsPtr->deleteProc == ItclDestroyClass2) {
-	return 1;
-    }
-    return (nsPtr->deleteProc == _TclOONamespaceDeleteProc);
+    ItclClass *iclsPtr = ItclNamespace2Class(nsPtr);
+    return iclsPtr != NULL;
 }
 
 

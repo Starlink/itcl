@@ -1460,8 +1460,7 @@ Itcl_UnsetContext(
     Itcl_DeleteStack(stackPtr);
     ckfree((char *) stackPtr);
     Tcl_DeleteHashEntry(hPtr);
-    contextPtr->refCount--;
-    if (contextPtr->refCount) {
+    if (--contextPtr->refCount) {
 	Tcl_Panic("frame context ref count not zero!");
     }
     ckfree((char *)contextPtr);
@@ -2465,7 +2464,7 @@ ItclCheckCallMethod(
 
     if (ioPtr != NULL) {
         ioPtr->callRefCount++;
-	Itcl_PreserveData(ioPtr);
+	ItclPreserveObject(ioPtr);
     }
     imPtr->iclsPtr->callRefCount++;
     if (!imPtr->iclsPtr->infoPtr->useOldResolvers) {
@@ -2580,7 +2579,7 @@ ItclAfterCallMethod(
             if (hPtr == NULL) {
                 ckfree((char *)callContextPtr);
 	    }
-            Itcl_ReleaseData(ioPtr);
+	    ItclReleaseObject(ioPtr);
         } else {
             ckfree((char *)callContextPtr);
         }

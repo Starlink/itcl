@@ -135,8 +135,9 @@ AC_DEFUN([TEA_PATH_TCLCONFIG], [
 		for i in `ls -d ${libdir} 2>/dev/null` \
 			`ls -d ${exec_prefix}/lib 2>/dev/null` \
 			`ls -d ${prefix}/lib 2>/dev/null` \
-			`ls -d /usr/local/lib 2>/dev/null` \
 			`ls -d /usr/contrib/lib 2>/dev/null` \
+			`ls -d /usr/local/lib 2>/dev/null` \
+			`ls -d /usr/pkg/lib 2>/dev/null` \
 			`ls -d /usr/lib 2>/dev/null` \
 			`ls -d /usr/lib64 2>/dev/null` \
 			`ls -d /usr/lib/tcl8.6 2>/dev/null` \
@@ -349,6 +350,8 @@ AC_DEFUN([TEA_PATH_TKCONFIG], [
 #		TCL_BIN_DIR
 #		TCL_SRC_DIR
 #		TCL_LIB_FILE
+#		TCL_ZIP_FILE
+#		TCL_ZIPFS_SUPPORT
 #------------------------------------------------------------------------
 
 AC_DEFUN([TEA_LOAD_TCLCONFIG], [
@@ -783,7 +786,7 @@ AC_DEFUN([TEA_ENABLE_SHARED], [
 AC_DEFUN([TEA_ENABLE_THREADS], [
     AC_ARG_ENABLE(threads,
 	AC_HELP_STRING([--enable-threads],
-	    [build with threads]),
+	    [build with threads (default: on)]),
 	[tcl_ok=$enableval], [tcl_ok=yes])
 
     if test "${enable_threads+set}" = set; then
@@ -1499,7 +1502,7 @@ AC_DEFUN([TEA_CONFIG_CFLAGS], [
 	    LDFLAGS="$LDFLAGS -Wl,--export-dynamic"
 	    SHLIB_CFLAGS="-fPIC"
 	    SHLIB_SUFFIX=".so"
-	    SHLIB_LD='${CC} -shared ${CFLAGS} ${LDFLAGS}'
+	    SHLIB_LD='${CC} ${CFLAGS} ${LDFLAGS} -shared'
 	    AC_CHECK_LIB(network, inet_ntoa, [LIBS="$LIBS -lnetwork"])
 	    ;;
 	HP-UX-*.11.*)
@@ -1610,7 +1613,7 @@ AC_DEFUN([TEA_CONFIG_CFLAGS], [
 	    CFLAGS_OPTIMIZE="-O2 -fomit-frame-pointer"
 
 	    # TEA specific: use LDFLAGS_DEFAULT instead of LDFLAGS
-	    SHLIB_LD='${CC} -shared ${CFLAGS} ${LDFLAGS_DEFAULT}'
+	    SHLIB_LD='${CC} ${CFLAGS} ${LDFLAGS_DEFAULT} -shared'
 	    LDFLAGS="$LDFLAGS -Wl,--export-dynamic"
 	    AS_IF([test $doRpath = yes], [
 		CC_SEARCH_FLAGS='-Wl,-rpath,${LIB_RUNTIME_DIR}'])
@@ -1649,37 +1652,21 @@ AC_DEFUN([TEA_CONFIG_CFLAGS], [
 	OpenBSD-*)
 	    arch=`arch -s`
 	    case "$arch" in
-	    vax)
-		SHLIB_SUFFIX=""
-		SHARED_LIB_SUFFIX=""
-		LDFLAGS=""
+	    alpha|sparc64)
+		SHLIB_CFLAGS="-fPIC"
 		;;
 	    *)
-		case "$arch" in
-		alpha|sparc64)
-		    SHLIB_CFLAGS="-fPIC"
-		    ;;
-		*)
-		    SHLIB_CFLAGS="-fpic"
-		    ;;
-		esac
-		SHLIB_LD='${CC} -shared ${SHLIB_CFLAGS}'
-		SHLIB_SUFFIX=".so"
-		AS_IF([test $doRpath = yes], [
-		    CC_SEARCH_FLAGS='-Wl,-rpath,${LIB_RUNTIME_DIR}'])
-		LD_SEARCH_FLAGS=${CC_SEARCH_FLAGS}
-		SHARED_LIB_SUFFIX='${TCL_TRIM_DOTS}.so${SHLIB_VERSION}'
-		LDFLAGS="-Wl,-export-dynamic"
+		SHLIB_CFLAGS="-fpic"
 		;;
 	    esac
-	    case "$arch" in
-	    vax)
-		CFLAGS_OPTIMIZE="-O1"
-		;;
-	    *)
-		CFLAGS_OPTIMIZE="-O2"
-		;;
-	    esac
+	    SHLIB_LD='${CC} ${SHLIB_CFLAGS} -shared'
+	    SHLIB_SUFFIX=".so"
+	    AS_IF([test $doRpath = yes], [
+		CC_SEARCH_FLAGS='-Wl,-rpath,${LIB_RUNTIME_DIR}'])
+	    LD_SEARCH_FLAGS=${CC_SEARCH_FLAGS}
+	    SHARED_LIB_SUFFIX='${TCL_TRIM_DOTS}.so${SHLIB_VERSION}'
+	    LDFLAGS="-Wl,-export-dynamic"
+	    CFLAGS_OPTIMIZE="-O2"
 	    AS_IF([test "${TCL_THREADS}" = "1"], [
 		# On OpenBSD:	Compile with -pthread
 		#		Don't link with -lpthread
@@ -1693,7 +1680,7 @@ AC_DEFUN([TEA_CONFIG_CFLAGS], [
 	NetBSD-*)
 	    # NetBSD has ELF and can use 'cc -shared' to build shared libs
 	    SHLIB_CFLAGS="-fPIC"
-	    SHLIB_LD='${CC} -shared ${SHLIB_CFLAGS}'
+	    SHLIB_LD='${CC} ${SHLIB_CFLAGS} -shared'
 	    SHLIB_SUFFIX=".so"
 	    LDFLAGS="$LDFLAGS -export-dynamic"
 	    AS_IF([test $doRpath = yes], [
@@ -2378,7 +2365,6 @@ closedir(d);
 
     # TEA specific:
     AC_CHECK_HEADER(errno.h, , [AC_DEFINE(NO_ERRNO_H, 1, [Do we have <errno.h>?])])
-    AC_CHECK_HEADER(float.h, , [AC_DEFINE(NO_FLOAT_H, 1, [Do we have <float.h>?])])
     AC_CHECK_HEADER(values.h, , [AC_DEFINE(NO_VALUES_H, 1, [Do we have <values.h>?])])
     AC_CHECK_HEADER(limits.h,
 	[AC_DEFINE(HAVE_LIMITS_H, 1, [Do we have <limits.h>?])],
@@ -4236,6 +4222,114 @@ AC_DEFUN([TEA_PATH_CELIB], [
 	fi
     fi
 ])
+
+###
+# Tip 430 - ZipFS Modifications
+###
+#------------------------------------------------------------------------
+# SC_ZIPFS_SUPPORT
+#	Locate a zip encoder installed on the system path, or none.
+#
+# Arguments:
+#	none
+#
+# Results:
+#	Substitutes the following vars:
+#		TCL_ZIP_FILE
+#		TCL_ZIPFS_SUPPORT
+#		TCL_ZIPFS_FLAG
+#		ZIP_PROG
+#------------------------------------------------------------------------
+
+#------------------------------------------------------------------------
+# SC_PROG_ZIP
+#	Locate a zip encoder installed on the system path, or none.
+#
+# Arguments:
+#	none
+#
+# Results:
+#	Substitutes the following vars:
+#		ZIP_PROG
+#       ZIP_PROG_OPTIONS
+#       ZIP_PROG_VFSSEARCH
+#       ZIP_INSTALL_OBJS
+#------------------------------------------------------------------------
+AC_DEFUN([TEA_ZIPFS_SUPPORT], [
+    AC_MSG_CHECKING([for zipfs support])
+    ZIP_PROG=""
+    ZIP_PROG_OPTIONS=""
+    ZIP_PROG_VFSSEARCH=""
+    INSTALL_MSGS=""
+    # If our native tclsh processes the "install" command line option
+    # we can use it to mint zip files
+    AS_IF([$TCLSH_PROG install],[
+      ZIP_PROG=${TCLSH_PROG}
+      ZIP_PROG_OPTIONS="install mkzip"
+      ZIP_PROG_VFSSEARCH="."
+      AC_MSG_RESULT([Can use Native Tclsh for Zip encoding])
+    ])
+    if test "x$ZIP_PROG" = "x" ; then
+        AC_CACHE_VAL(ac_cv_path_zip, [
+        search_path=`echo ${PATH} | sed -e 's/:/ /g'`
+        for dir in $search_path ; do
+            for j in `ls -r $dir/zip 2> /dev/null` \
+                `ls -r $dir/zip 2> /dev/null` ; do
+            if test x"$ac_cv_path_zip" = x ; then
+                if test -f "$j" ; then
+                ac_cv_path_zip=$j
+                break
+                fi
+            fi
+            done
+        done
+        ])
+        if test -f "$ac_cv_path_zip" ; then
+            ZIP_PROG="$ac_cv_path_zip "
+            AC_MSG_RESULT([$ZIP_PROG])
+            ZIP_PROG_OPTIONS="-rq"
+            ZIP_PROG_VFSSEARCH="."
+            AC_MSG_RESULT([Found INFO Zip in environment])
+            # Use standard arguments for zip
+        fi
+    fi
+    if test "x$ZIP_PROG" = "x" ; then
+	    # It is not an error if an installed version of Zip can't be located.
+        ZIP_PROG=""
+        ZIP_PROG_OPTIONS=""
+        ZIP_PROG_VFSSEARCH=""
+        TCL_ZIPFS_SUPPORT=0
+        TCL_ZIPFS_FLAG=
+    else
+        # ZIPFS Support
+       eval "TCL_ZIP_FILE=\"${TCL_ZIP_FILE}\""
+       if test ${TCL_ZIP_FILE} = "" ; then
+          TCL_ZIPFS_SUPPORT=0
+          TCL_ZIPFS_FLAG=
+          INSTALL_LIBRARIES=install-libraries
+          INSTALL_MSGS=install-msgs
+       else
+           if test ${SHARED_BUILD} = 1 ; then
+              TCL_ZIPFS_SUPPORT=1
+              INSTALL_LIBRARIES=install-libraries-zipfs-shared
+           else
+              TCL_ZIPFS_SUPPORT=2
+              INSTALL_LIBRARIES=install-libraries-zipfs-static
+           fi
+          TCL_ZIPFS_FLAG=-DTCL_ZIPFS_SUPPORT
+       fi
+    fi
+
+    AC_SUBST(TCL_ZIP_FILE)
+    AC_SUBST(TCL_ZIPFS_SUPPORT)
+    AC_SUBST(TCL_ZIPFS_FLAG)
+    AC_SUBST(ZIP_PROG)
+    AC_SUBST(ZIP_PROG_OPTIONS)
+    AC_SUBST(ZIP_PROG_VFSSEARCH)
+    AC_SUBST(INSTALL_LIBRARIES)
+    AC_SUBST(INSTALL_MSGS)
+])
+
 # Local Variables:
 # mode: autoconf
 # End:
