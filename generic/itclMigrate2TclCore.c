@@ -26,10 +26,12 @@ Itcl_SetCallFrameResolver(
     CallFrame *framePtr = ((Interp *)interp)->framePtr;
     if (framePtr != NULL) {
 #ifdef ITCL_USE_MODIFIED_TCL_H
-        framePtr->isProcCallFrame |= FRAME_HAS_RESOLVER;
+	framePtr->isProcCallFrame |= FRAME_HAS_RESOLVER;
 	framePtr->resolvePtr = resolvePtr;
+#elif defined(__cplusplus)
+	(void)resolvePtr;
 #endif
-        return TCL_OK;
+	return TCL_OK;
     }
     return TCL_ERROR;
 }
@@ -44,28 +46,48 @@ _Tcl_SetNamespaceResolver(
     }
 #ifdef ITCL_USE_MODIFIED_TCL_H
     ((Namespace *)nsPtr)->resolvePtr = resolvePtr;
+#elif defined(__cplusplus)
+    (void)resolvePtr;
 #endif
     return TCL_OK;
 }
 
 Tcl_Var
 Tcl_NewNamespaceVar(
-    Tcl_Interp *interp,
+    TCL_UNUSED(Tcl_Interp *),
     Tcl_Namespace *nsPtr,
     const char *varName)
 {
     Var *varPtr = NULL;
-    int new;
+    int isNew;
 
     if ((nsPtr == NULL) || (varName == NULL)) {
         return NULL;
     }
 
     varPtr = TclVarHashCreateVar(&((Namespace *)nsPtr)->varTable,
-            varName, &new);
+            varName, &isNew);
     TclSetVarNamespaceVar(varPtr);
-    VarHashRefCount(varPtr)++;
     return (Tcl_Var)varPtr;
+}
+
+void
+Itcl_PreserveVar(
+    Tcl_Var var)
+{
+    Var *varPtr = (Var *)var;
+
+    VarHashRefCount(varPtr)++;
+}
+
+void
+Itcl_ReleaseVar(
+    Tcl_Var var)
+{
+    Var *varPtr = (Var *)var;
+
+    VarHashRefCount(varPtr)--;
+    TclCleanupVar(varPtr, NULL);
 }
 
 Tcl_CallFrame *
@@ -77,7 +99,7 @@ Itcl_GetUplevelCallFrame(
     if (level < 0) {
         return NULL;
     }
-    framePtr = ((Interp *)interp)->framePtr;
+    framePtr = ((Interp *)interp)->varFramePtr;
     while ((framePtr != NULL) && (level-- > 0)) {
         framePtr = framePtr->callerVarPtr;
     }
@@ -86,7 +108,6 @@ Itcl_GetUplevelCallFrame(
     }
     return (Tcl_CallFrame *)framePtr;
 }
-
 
 Tcl_CallFrame *
 Itcl_ActivateCallFrame(
@@ -121,11 +142,14 @@ Itcl_GetUplevelNamespace(
     return (Tcl_Namespace *)framePtr->nsPtr;
 }
 
-ClientData
+void *
 Itcl_GetCallFrameClientData(
     Tcl_Interp *interp)
 {
-    CallFrame *framePtr = ((Interp *)interp)->framePtr;
+    /* suggested fix for SF bug #250 use varFramePtr instead of framePtr
+     * seems to have no side effect concerning test suite, but does NOT fix the bug
+     */
+    CallFrame *framePtr = ((Interp *)interp)->varFramePtr;
     if (framePtr == NULL) {
         return NULL;
     }
@@ -137,15 +161,37 @@ Itcl_SetCallFrameNamespace(
     Tcl_Interp *interp,
     Tcl_Namespace *nsPtr)
 {
-    CallFrame *framePtr = ((Interp *)interp)->framePtr;
+    CallFrame *framePtr = ((Interp *)interp)->varFramePtr;
     if (framePtr == NULL) {
         return TCL_ERROR;
     }
-    ((Interp *)interp)->framePtr->nsPtr = (Namespace *)nsPtr;
+    ((Interp *)interp)->varFramePtr->nsPtr = (Namespace *)nsPtr;
     return TCL_OK;
 }
 
-int
+size_t
+Itcl_GetCallVarFrameObjc(
+    Tcl_Interp *interp)
+{
+    CallFrame *framePtr = ((Interp *)interp)->varFramePtr;
+    if (framePtr == NULL) {
+        return 0;
+    }
+    return framePtr->objc;
+}
+
+Tcl_Obj *const *
+Itcl_GetCallVarFrameObjv(
+    Tcl_Interp *interp)
+{
+    CallFrame *framePtr = ((Interp *)interp)->varFramePtr;
+    if (framePtr == NULL) {
+        return NULL;
+    }
+    return framePtr->objv;
+}
+
+Tcl_Size
 Itcl_GetCallFrameObjc(
     Tcl_Interp *interp)
 {
@@ -156,7 +202,7 @@ Itcl_GetCallFrameObjc(
     return ((Interp *)interp)->framePtr->objc;
 }
 
-Tcl_Obj * const *
+Tcl_Obj *const *
 Itcl_GetCallFrameObjv(
     Tcl_Interp *interp)
 {
@@ -191,7 +237,7 @@ Itcl_IsCallFrameArgument(
 
         for (;localPtr != NULL; localPtr = localPtr->nextPtr) {
             if (TclIsVarArgument(localPtr)) {
-                register char *localName = localPtr->name;
+                char *localName = localPtr->name;
                 if ((name[0] == localName[0])
                         && (nameLen == localPtr->nameLength)
                         && (strcmp(name, localName) == 0)) {

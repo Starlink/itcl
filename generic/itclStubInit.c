@@ -5,6 +5,8 @@
 
 #include "itclInt.h"
 
+#undef Itcl_GetStackValue
+
 MODULE_SCOPE const ItclStubs itclStubs;
 /* !BEGIN!: Do not edit below this line. */
 
@@ -57,7 +59,7 @@ static const ItclIntStubs itclIntStubs = {
     Itcl_GetCommonVar, /* 41 */
     0, /* 42 */
     0, /* 43 */
-    0, /* 44 */
+    Itcl_CreateObject, /* 44 */
     Itcl_DeleteObject, /* 45 */
     Itcl_DestructObject, /* 46 */
     0, /* 47 */
@@ -112,7 +114,7 @@ static const ItclIntStubs itclIntStubs = {
     Itcl_BiInfoVariableCmd, /* 96 */
     Itcl_BiInfoBodyCmd, /* 97 */
     Itcl_BiInfoArgsCmd, /* 98 */
-    Itcl_DefaultInfoCmd, /* 99 */
+    0, /* 99 */
     Itcl_EnsembleInit, /* 100 */
     Itcl_CreateEnsemble, /* 101 */
     Itcl_AddEnsemblePart, /* 102 */
@@ -163,7 +165,7 @@ static const ItclIntStubs itclIntStubs = {
     0, /* 147 */
     0, /* 148 */
     0, /* 149 */
-    Itcl_BiInfoCmd, /* 150 */
+    0, /* 150 */
     Itcl_BiInfoUnknownCmd, /* 151 */
     Itcl_BiInfoVarsCmd, /* 152 */
     Itcl_CanAccess2, /* 153 */
@@ -191,6 +193,13 @@ static const ItclIntStubs itclIntStubs = {
     Itcl_PopCallFrame, /* 175 */
     Itcl_GetUplevelCallFrame, /* 176 */
     Itcl_ActivateCallFrame, /* 177 */
+    ItclSetInstanceVar, /* 178 */
+    ItclCapitalize, /* 179 */
+    ItclClassBaseCmd, /* 180 */
+    ItclCreateComponent, /* 181 */
+    Itcl_SetContext, /* 182 */
+    Itcl_UnsetContext, /* 183 */
+    ItclGetInstanceVar, /* 184 */
 };
 
 static const ItclStubHooks itclStubHooks = {
@@ -228,6 +237,9 @@ const ItclStubs itclStubs = {
     Itcl_SaveInterpState, /* 23 */
     Itcl_RestoreInterpState, /* 24 */
     Itcl_DiscardInterpState, /* 25 */
+    Itcl_Alloc, /* 26 */
+    Itcl_Free, /* 27 */
+    ItclGetStackValue, /* 28 */
 };
 
 /* !END!: Do not edit above this line. */

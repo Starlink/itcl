@@ -28,6 +28,7 @@
  * See the file "license.terms" for information on usage and redistribution
  * of this file, and for a DISCLAIMER OF ALL WARRANTIES.
  */
+#include "tclInt.h"
 #include "itclInt.h"
 /*
  * ------------------------------------------------------------------------
@@ -41,34 +42,34 @@
  *  Returns TCL_OK/TCL_ERROR to indicate success/failure.
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 static int
 NRThisCmd(
-    ClientData clientData,   /* class info */
+    void *clientData,        /* class info */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
     Tcl_Obj *const objv[])   /* argument objects */
 {
-    ClientData clientData2;
+    void *clientData2;
     Tcl_Object oPtr;
     ItclClass *iclsPtr;
 
     ItclShowArgs(1, "NRThisCmd", objc, objv);
-    iclsPtr = clientData;
+    iclsPtr = (ItclClass *)clientData;
     clientData2 = Itcl_GetCallFrameClientData(interp);
-    oPtr = Tcl_ObjectContextObject(clientData2);
+    oPtr = Tcl_ObjectContextObject((Tcl_ObjectContext)clientData2);
     return Itcl_PublicObjectCmd(oPtr, interp, iclsPtr->clsPtr, objc, objv);
 }
-/* ARGSUSED */
+
 int
 Itcl_ThisCmd(
-    ClientData clientData,
+    void *clientData,
     Tcl_Interp *interp,
     int objc,
     Tcl_Obj *const *objv)
 {
     FOREACH_HASH_DECLS;
-    ClientData clientData2;
+    void *clientData2;
     Tcl_Object oPtr;
     Tcl_Obj **newObjv;
     ItclClass *iclsPtr;
@@ -81,14 +82,14 @@ Itcl_ThisCmd(
         return Itcl_SelfCmd(clientData,interp, objc, objv);
     }
     ItclShowArgs(1, "Itcl_ThisCmd", objc, objv);
-    iclsPtr = clientData;
+    iclsPtr = (ItclClass *)clientData;
     clientData2 = Itcl_GetCallFrameClientData(interp);
     if (clientData2 == NULL) {
 	Tcl_AppendResult(interp,
 	        "this cannot be invoked without an object context", NULL);
         return TCL_ERROR;
     }
-    oPtr = Tcl_ObjectContextObject(clientData2);
+    oPtr = Tcl_ObjectContextObject((Tcl_ObjectContext)clientData2);
     if (oPtr == NULL) {
 	Tcl_AppendResult(interp,
 	        "this cannot be invoked without an object context", NULL);
@@ -165,10 +166,10 @@ ItclShowArgs(1, "EVAL2", objc+1, newObjv);
  *  Returns TCL_OK/TCL_ERROR to indicate success/failure.
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 int
 Itcl_FindClassesCmd(
-    ClientData clientData,   /* class/object info */
+    TCL_UNUSED(void *),      /* class/object info */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
     Tcl_Obj *const objv[])   /* argument objects */
@@ -210,14 +211,14 @@ Itcl_FindClassesCmd(
      */
 
     Itcl_InitStack(&search);
-    Itcl_PushStack((ClientData)globalNs, &search);
-    Itcl_PushStack((ClientData)activeNs, &search);  /* last in, first out! */
+    Itcl_PushStack(globalNs, &search);
+    Itcl_PushStack(activeNs, &search);  /* last in, first out! */
 
     Tcl_InitHashTable(&unique, TCL_ONE_WORD_KEYS);
 
     handledActiveNs = 0;
     while (Itcl_GetStackSize(&search) > 0) {
-        nsPtr = Itcl_PopStack(&search);
+        nsPtr = (Tcl_Namespace *)Itcl_PopStack(&search);
         if (nsPtr == activeNs && handledActiveNs) {
             continue;
         }
@@ -241,7 +242,7 @@ Itcl_FindClassesCmd(
                 if (forceFullNames || nsPtr != activeNs ||
                     originalCmd != NULL) {
 
-                    objPtr = Tcl_NewStringObj((char*)NULL, 0);
+                    objPtr = Tcl_NewStringObj(NULL, 0);
                     Tcl_GetCommandFullName(interp, cmd, objPtr);
                     cmdName = Tcl_GetString(objPtr);
                 } else {
@@ -256,8 +257,8 @@ Itcl_FindClassesCmd(
 
                 if (newEntry &&
 			((pattern == NULL) ||
-			Tcl_StringMatch((const char *)cmdName, pattern))) {
-                    Tcl_ListObjAppendElement((Tcl_Interp*)NULL,
+			Tcl_StringCaseMatch((const char *)cmdName, pattern, 0))) {
+                    Tcl_ListObjAppendElement(NULL,
 			    Tcl_GetObjResult(interp), objPtr);
                 } else {
 		    /* if not appended to the result, free objPtr. */
@@ -301,7 +302,7 @@ Itcl_FindClassesCmd(
  */
 int
 Itcl_FindObjectsCmd(
-    ClientData clientData,   /* class/object info */
+    TCL_UNUSED(void *),      /* class/object info */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
     Tcl_Obj *const objv[])   /* argument objects */
@@ -392,14 +393,14 @@ Itcl_FindObjectsCmd(
      */
 
     Itcl_InitStack(&search);
-    Itcl_PushStack((ClientData)globalNs, &search);
-    Itcl_PushStack((ClientData)activeNs, &search);  /* last in, first out! */
+    Itcl_PushStack(globalNs, &search);
+    Itcl_PushStack(activeNs, &search);  /* last in, first out! */
 
     Tcl_InitHashTable(&unique, TCL_ONE_WORD_KEYS);
 
     handledActiveNs = 0;
     while (Itcl_GetStackSize(&search) > 0) {
-        nsPtr = Itcl_PopStack(&search);
+        nsPtr = (Tcl_Namespace *)Itcl_PopStack(&search);
         if (nsPtr == activeNs && handledActiveNs) {
             continue;
         }
@@ -427,7 +428,7 @@ Itcl_FindObjectsCmd(
                 if (forceFullNames || nsPtr != activeNs ||
                     originalCmd != NULL) {
 
-                    objPtr = Tcl_NewStringObj((char*)NULL, 0);
+                    objPtr = Tcl_NewStringObj(NULL, 0);
                     Tcl_GetCommandFullName(interp, cmd, objPtr);
 		    cmdName = Tcl_GetString(objPtr);
                 } else {
@@ -439,8 +440,8 @@ Itcl_FindObjectsCmd(
 
                 match = 0;
 		if (newEntry &&
-			(!pattern || Tcl_StringMatch((const char *)cmdName,
-			pattern))) {
+			(!pattern || Tcl_StringCaseMatch((const char *)cmdName,
+			pattern, 0))) {
                     if ((iclsPtr == NULL) ||
 		            (contextIoPtr->iclsPtr == iclsPtr)) {
                         if (isaDefn == NULL) {
@@ -458,7 +459,7 @@ Itcl_FindObjectsCmd(
                 }
 
                 if (match) {
-                    Tcl_ListObjAppendElement((Tcl_Interp*)NULL,
+                    Tcl_ListObjAppendElement(NULL,
                         Tcl_GetObjResult(interp), objPtr);
                 } else {
                     Tcl_DecrRefCount(objPtr);  /* throw away the name */
@@ -497,10 +498,10 @@ Itcl_FindObjectsCmd(
  *  Returns TCL_OK/TCL_ERROR to indicate success/failure.
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 static int
 NRDelClassCmd(
-    ClientData clientData,   /* unused */
+    TCL_UNUSED(void *),      /* unused */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
     Tcl_Obj *const objv[])   /* argument objects */
@@ -540,10 +541,10 @@ NRDelClassCmd(
     return TCL_OK;
 }
 
-/* ARGSUSED */
+
 int
 Itcl_DelClassCmd(
-    ClientData clientData,
+    void *clientData,
     Tcl_Interp *interp,
     int objc,
     Tcl_Obj *const *objv)
@@ -567,11 +568,11 @@ Itcl_DelClassCmd(
  */
 static int
 CallDeleteObject(
-    ClientData data[],
+    void *data[],
     Tcl_Interp *interp,
     int result)
 {
-    ItclObject *contextIoPtr = data[0];
+    ItclObject *contextIoPtr = (ItclObject *)data[0];
     if (contextIoPtr->destructorHasBeenCalled) {
 	Tcl_AppendResult(interp, "can't delete an object while it is being ",
 	        "destructed", NULL);
@@ -585,7 +586,7 @@ CallDeleteObject(
 
 static int
 NRDelObjectCmd(
-    ClientData clientData,   /* object management info */
+    TCL_UNUSED(void *),      /* object management info */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
     Tcl_Obj *const objv[])   /* argument objects */
@@ -603,7 +604,7 @@ NRDelObjectCmd(
      *  abort with an error.
      */
     for (i=1; i < objc; i++) {
-        name = Tcl_GetStringFromObj(objv[i], (int*)NULL);
+        name = Tcl_GetString(objv[i]);
 	contextIoPtr = NULL;
         if (Itcl_FindObject(interp, name, &contextIoPtr) != TCL_OK) {
             return TCL_ERROR;
@@ -612,7 +613,7 @@ NRDelObjectCmd(
         if (contextIoPtr == NULL) {
             Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
                 "object \"", name, "\" not found",
-                (char*)NULL);
+                NULL);
             return TCL_ERROR;
         }
 
@@ -627,10 +628,10 @@ NRDelObjectCmd(
     return TCL_OK;
 }
 
-/* ARGSUSED */
+
 int
 Itcl_DelObjectCmd(
-    ClientData clientData,
+    void *clientData,
     Tcl_Interp *interp,
     int objc,
     Tcl_Obj *const *objv)
@@ -658,20 +659,16 @@ Itcl_DelObjectCmd(
  *    ::namesp::namesp::class::variable
  *
  *  If the <variable> is an instance variable, this procedure returns
- *  a name of the form:
- *
- *    @itcl ::namesp::namesp::object variable
- *
- *  This kind of scoped value is recognized by the Itcl_ScopedVarResolver
- *  proc, which handles variable resolution for the entire interpreter.
+ *  a name in a format that Tcl can use to find the same variable from
+ *  any context.
  *
  *  Returns TCL_OK/TCL_ERROR to indicate success/failure.
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 int
 Itcl_ScopeCmd(
-    ClientData dummy,        /* unused */
+    TCL_UNUSED(void *),      /* unused */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
     Tcl_Obj *const objv[])   /* argument objects */
@@ -679,8 +676,6 @@ Itcl_ScopeCmd(
     Tcl_Namespace *contextNsPtr;
     Tcl_HashEntry *hPtr;
     Tcl_Object oPtr;
-    Tcl_InterpDeleteProc *procPtr;
-    Tcl_Obj *objPtr;
     Tcl_Obj *objPtr2;
     Tcl_Var var;
     Tcl_HashEntry *entry;
@@ -689,7 +684,7 @@ Itcl_ScopeCmd(
     ItclObjectInfo *infoPtr;
     ItclVarLookup *vlookup;
     char *openParen;
-    register char *p;
+    char *p;
     char *token;
     int doAppend;
     int result;
@@ -707,7 +702,7 @@ Itcl_ScopeCmd(
      *  If this looks like a fully qualified name already,
      *  then return it as is.
      */
-    token = Tcl_GetStringFromObj(objv[1], (int*)NULL);
+    token = Tcl_GetString(objv[1]);
     if (*token == ':' && *(token+1) == ':') {
         Tcl_SetObjResult(interp, objv[1]);
         return TCL_OK;
@@ -744,20 +739,20 @@ Itcl_ScopeCmd(
     contextIoPtr = NULL;
     contextIclsPtr = NULL;
     oPtr = NULL;
-    infoPtr = Tcl_GetAssocData(interp, ITCL_INTERP_DATA, &procPtr);
+    infoPtr = (ItclObjectInfo *)Tcl_GetAssocData(interp, ITCL_INTERP_DATA, NULL);
     hPtr = Tcl_FindHashEntry(&infoPtr->namespaceClasses, (char *)contextNsPtr);
     if (hPtr != NULL) {
         contextIclsPtr = (ItclClass *)Tcl_GetHashValue(hPtr);
     }
     if (Itcl_IsClassNamespace(contextNsPtr)) {
-	ClientData clientData;
+	void *clientData;
 
-        entry = Tcl_FindHashEntry(&contextIclsPtr->resolveVars, token);
+        entry = ItclResolveVarEntry(contextIclsPtr, token);
         if (!entry) {
             Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
                 "variable \"", token, "\" not found in class \"",
                 Tcl_GetString(contextIclsPtr->fullNamePtr), "\"",
-                (char*)NULL);
+                NULL);
             result = TCL_ERROR;
             goto scopeCmdDone;
         }
@@ -768,8 +763,8 @@ Itcl_ScopeCmd(
 	    if (vlookup->ivPtr->protection != ITCL_PUBLIC) {
 	        Tcl_AppendToObj(resultPtr, ITCL_VARIABLES_NAMESPACE, -1);
 	    }
-            Tcl_AppendToObj(resultPtr,
-	        Tcl_GetString(vlookup->ivPtr->fullNamePtr), -1);
+	    Tcl_AppendToObj(resultPtr,
+		    Tcl_GetString(vlookup->ivPtr->fullNamePtr), -1);
             if (openParen) {
                 *openParen = '(';
                 Tcl_AppendToObj(resultPtr, openParen, -1);
@@ -801,8 +796,8 @@ Itcl_ScopeCmd(
         if (contextIoPtr == NULL) {
             Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
                 "can't scope variable \"", token,
-                "\": missing object context\"",
-                (char*)NULL);
+                "\": missing object context",
+                NULL);
             result = TCL_ERROR;
             goto scopeCmdDone;
         }
@@ -813,22 +808,13 @@ Itcl_ScopeCmd(
 	        doAppend = 0;
             }
         }
-        objPtr = Tcl_NewStringObj((char*)NULL, 0);
-        Tcl_IncrRefCount(objPtr);
-	if (doAppend) {
-	    Tcl_AppendToObj(objPtr, "::", -1);
-	    Tcl_AppendToObj(objPtr,
-	            Tcl_GetString(contextIoPtr->namePtr), -1);
-	} else {
-	    Tcl_AppendToObj(objPtr, "::", -1);
-	    Tcl_AppendToObj(objPtr,
-	            Tcl_GetString(contextIoPtr->namePtr), -1);
-	}
 
-        objPtr2 = Tcl_NewStringObj((char*)NULL, 0);
+        objPtr2 = Tcl_NewStringObj(NULL, 0);
         Tcl_IncrRefCount(objPtr2);
 	Tcl_AppendToObj(objPtr2, ITCL_VARIABLES_NAMESPACE, -1);
-	Tcl_AppendToObj(objPtr2, Tcl_GetString(objPtr), -1);
+	Tcl_AppendToObj(objPtr2,
+		(Tcl_GetObjectNamespace(contextIoPtr->oPtr))->fullName, -1);
+
         if (doAppend) {
             Tcl_AppendToObj(objPtr2,
 	            Tcl_GetString(vlookup->ivPtr->fullNamePtr), -1);
@@ -843,8 +829,8 @@ Itcl_ScopeCmd(
             Tcl_AppendToObj(objPtr2, openParen, -1);
             openParen = NULL;
         }
-        Tcl_AppendElement(interp, Tcl_GetString(objPtr2));
-        Tcl_DecrRefCount(objPtr);
+        /* fix for SF bug #238 use Tcl_AppendResult instead of Tcl_AppendElement */
+        Tcl_AppendResult(interp, Tcl_GetString(objPtr2), NULL);
         Tcl_DecrRefCount(objPtr2);
     } else {
 
@@ -866,7 +852,7 @@ Itcl_ScopeCmd(
             Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
                 "variable \"", token, "\" not found in namespace \"",
                 contextNsPtr->fullName, "\"",
-                (char*)NULL);
+                NULL);
             result = TCL_ERROR;
             goto scopeCmdDone;
         }
@@ -907,10 +893,10 @@ scopeCmdDone:
  *  Returns TCL_OK/TCL_ERROR to indicate success/failure.
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 int
 Itcl_CodeCmd(
-    ClientData dummy,        /* unused */
+    TCL_UNUSED(void *),      /* unused */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
     Tcl_Obj *const objv[])   /* argument objects */
@@ -927,7 +913,7 @@ Itcl_CodeCmd(
      *  Handle flags like "-namespace"...
      */
     for (pos=1; pos < objc; pos++) {
-        token = Tcl_GetStringFromObj(objv[pos], (int*)NULL);
+        token = Tcl_GetString(objv[pos]);
         if (*token != '-') {
             break;
         }
@@ -940,7 +926,7 @@ Itcl_CodeCmd(
             } else {
                 token = Tcl_GetString(objv[pos+1]);
                 contextNs = Tcl_FindNamespace(interp, token,
-                    (Tcl_Namespace*)NULL, TCL_LEAVE_ERR_MSG);
+                    NULL, TCL_LEAVE_ERR_MSG);
 
                 if (!contextNs) {
                     return TCL_ERROR;
@@ -954,7 +940,7 @@ Itcl_CodeCmd(
             } else {
                 Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
                     "bad option \"", token, "\": should be -namespace or --",
-                    (char*)NULL);
+                    NULL);
                 return TCL_ERROR;
             }
         }
@@ -971,7 +957,7 @@ Itcl_CodeCmd(
      *  current namespace context, and appending the remaining
      *  arguments AS A LIST...
      */
-    listPtr = Tcl_NewListObj(0, (Tcl_Obj**)NULL);
+    listPtr = Tcl_NewListObj(0, NULL);
 
     Tcl_ListObjAppendElement(interp, listPtr,
         Tcl_NewStringObj("namespace", -1));
@@ -991,8 +977,7 @@ Itcl_CodeCmd(
         objPtr = Tcl_NewListObj(objc-pos, &objv[pos]);
     }
     Tcl_ListObjAppendElement(interp, listPtr, objPtr);
-    Tcl_SetResult(interp, Tcl_GetString(listPtr), TCL_VOLATILE);
-    Tcl_DecrRefCount(listPtr);
+    Tcl_SetObjResult(interp, listPtr);
     return TCL_OK;
 }
 
@@ -1012,7 +997,7 @@ Itcl_CodeCmd(
  */
 int
 Itcl_IsObjectCmd(
-    ClientData clientData,   /* class/object info */
+    TCL_UNUSED(void *),      /* class/object info */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
     Tcl_Obj *const objv[])   /* argument objects */
@@ -1061,7 +1046,7 @@ Itcl_IsObjectCmd(
         }
 
     } /* end for objc loop */
-        
+
 
     /*
      *  The object name may be a scoped value of the form
@@ -1079,7 +1064,7 @@ Itcl_IsObjectCmd(
      *    Need the NULL test, or the test will fail if cmd is NULL
      */
     if (cmd == NULL || ! Itcl_IsObject(cmd)) {
-        Tcl_SetObjResult(interp, Tcl_NewBooleanObj(0));
+        Tcl_SetObjResult(interp, Tcl_NewWideIntObj(0));
 	ckfree((char *)cmdName);
         return TCL_OK;
     }
@@ -1089,7 +1074,7 @@ Itcl_IsObjectCmd(
      */
     if (classFlag) {
 	ItclObject *contextIoPtr;
-        if (Itcl_FindObject(interp, Tcl_GetCommandName(interp, cmd), &contextIoPtr) != TCL_OK) {
+        if (Itcl_FindObject(interp, cmdName, &contextIoPtr) != TCL_OK) {
             return TCL_ERROR;
         }
 	if (contextIoPtr == NULL) {
@@ -1097,7 +1082,7 @@ Itcl_IsObjectCmd(
 	   contextIoPtr = iclsPtr->infoPtr->currIoPtr;
 	}
         if (! Itcl_ObjectIsa(contextIoPtr, iclsPtr)) {
-            Tcl_SetObjResult(interp, Tcl_NewBooleanObj(0));
+            Tcl_SetObjResult(interp, Tcl_NewWideIntObj(0));
 	    ckfree((char *)cmdName);
             return TCL_OK;
         }
@@ -1107,7 +1092,7 @@ Itcl_IsObjectCmd(
     /*
      *    Got this far, so assume that it is a valid object
      */
-    Tcl_SetObjResult(interp, Tcl_NewBooleanObj(1));
+    Tcl_SetObjResult(interp, Tcl_NewWideIntObj(1));
     ckfree(cmdName);
 
     return TCL_OK;
@@ -1130,7 +1115,7 @@ Itcl_IsObjectCmd(
  */
 int
 Itcl_IsClassCmd(
-    ClientData clientData,   /* class/object info */
+    TCL_UNUSED(void *),      /* class/object info */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
     Tcl_Obj *const objv[])   /* argument objects */
@@ -1167,9 +1152,9 @@ Itcl_IsClassCmd(
      *    isn't a class
      */
     if (iclsPtr != NULL) {
-        Tcl_SetObjResult(interp, Tcl_NewBooleanObj(1));
+        Tcl_SetObjResult(interp, Tcl_NewWideIntObj(1));
     } else {
-        Tcl_SetObjResult(interp, Tcl_NewBooleanObj(0));
+        Tcl_SetObjResult(interp, Tcl_NewWideIntObj(0));
     }
 
     ckfree(cname);
@@ -1188,10 +1173,10 @@ Itcl_IsClassCmd(
  *  Returns TCL_OK/TCL_ERROR to indicate success/failure.
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 int
 Itcl_FilterAddCmd(
-    ClientData dummy,        /* unused */
+    TCL_UNUSED(void *),      /* unused */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
     Tcl_Obj *const objv[])   /* argument objects */
@@ -1230,10 +1215,10 @@ Itcl_FilterAddCmd(
  *  Returns TCL_OK/TCL_ERROR to indicate success/failure.
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 int
 Itcl_FilterDeleteCmd(
-    ClientData dummy,        /* unused */
+    TCL_UNUSED(void *),      /* unused */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
     Tcl_Obj *const objv[])   /* argument objects */
@@ -1249,16 +1234,16 @@ Itcl_FilterDeleteCmd(
  * ------------------------------------------------------------------------
  *  Itcl_ForwardAddCmd()
  *
- *  Used to similar to iterp alias to forward the call of a method 
+ *  Used to similar to iterp alias to forward the call of a method
  *  to another method within the class
  *
  *  Returns TCL_OK/TCL_ERROR to indicate success/failure.
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 int
 Itcl_ForwardAddCmd(
-    ClientData dummy,        /* unused */
+    TCL_UNUSED(void *),      /* unused */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
     Tcl_Obj *const objv[])   /* argument objects */
@@ -1273,7 +1258,7 @@ Itcl_ForwardAddCmd(
         Tcl_WrongNumArgs(interp, 1, objv, "<forwardName> <targetName> ?<arg> ...?");
         return TCL_ERROR;
     }
-    infoPtr = Tcl_GetAssocData(interp, ITCL_INTERP_DATA, NULL);
+    infoPtr = (ItclObjectInfo *)Tcl_GetAssocData(interp, ITCL_INTERP_DATA, NULL);
     iclsPtr = (ItclClass*)Itcl_PeekStack(&infoPtr->clsStack);
     if (iclsPtr == NULL) {
 	Tcl_HashEntry *hPtr;
@@ -1283,7 +1268,7 @@ Itcl_ForwardAddCmd(
 	            "\" not found", NULL);
 	    return TCL_ERROR;
 	}
-        iclsPtr = Tcl_GetHashValue(hPtr);
+	iclsPtr = (ItclClass *)Tcl_GetHashValue(hPtr);
     }
     prefixObj = Tcl_NewListObj(objc-2, objv+2);
     mPtr = Itcl_NewForwardClassMethod(interp, iclsPtr->clsPtr, 1,
@@ -1303,10 +1288,10 @@ Itcl_ForwardAddCmd(
  *  Returns TCL_OK/TCL_ERROR to indicate success/failure.
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 int
 Itcl_ForwardDeleteCmd(
-    ClientData dummy,        /* unused */
+    TCL_UNUSED(void *),      /* unused */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
     Tcl_Obj *const objv[])   /* argument objects */
@@ -1327,17 +1312,15 @@ Itcl_ForwardDeleteCmd(
  *  Returns TCL_OK/TCL_ERROR to indicate success/failure.
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 int
 Itcl_MixinAddCmd(
-    ClientData dummy,        /* unused */
+    TCL_UNUSED(void *),      /* unused */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
     Tcl_Obj *const objv[])   /* argument objects */
 {
     Tcl_Obj **newObjv;
-    ItclObjectInfo *infoPtr;
-    ItclClass *iclsPtr;
     int result;
 
     ItclShowArgs(1, "Itcl_MixinAddCmd", objc, objv);
@@ -1345,8 +1328,6 @@ Itcl_MixinAddCmd(
         Tcl_WrongNumArgs(interp, 1, objv, "<className> <mixinName> ?<mixinName> ...?");
         return TCL_ERROR;
     }
-    infoPtr = Tcl_GetAssocData(interp, ITCL_INTERP_DATA, NULL);
-    iclsPtr = (ItclClass*)Itcl_PeekStack(&infoPtr->clsStack);
     newObjv = (Tcl_Obj **)ckalloc(sizeof(Tcl_Obj *)*(objc+1));
     newObjv[0] = Tcl_NewStringObj("::oo::define", -1);
     Tcl_IncrRefCount(newObjv[0]);
@@ -1371,10 +1352,10 @@ Itcl_MixinAddCmd(
  *  Returns TCL_OK/TCL_ERROR to indicate success/failure.
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 int
 Itcl_MixinDeleteCmd(
-    ClientData dummy,        /* unused */
+    TCL_UNUSED(void *),      /* unused */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
     Tcl_Obj *const objv[])   /* argument objects */
@@ -1395,19 +1376,17 @@ Itcl_MixinDeleteCmd(
  *  Returns TCL_OK/TCL_ERROR to indicate success/failure.
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 int
 Itcl_NWidgetCmd(
-    ClientData clientData,   /* infoPtr */
+    void *clientData,        /* infoPtr */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
     Tcl_Obj *const objv[])   /* argument objects */
 {
     ItclClass *iclsPtr;
-    ItclObjectInfo *infoPtr;
     int result;
 
-    infoPtr = (ItclObjectInfo *)clientData;
     iclsPtr = NULL;
     ItclShowArgs(0, "Itcl_NWidgetCmd", objc-1, objv);
     result = ItclClassBaseCmd(clientData, interp, ITCL_ECLASS|ITCL_NWIDGET, objc, objv,
@@ -1433,10 +1412,10 @@ Itcl_NWidgetCmd(
  *  Returns TCL_OK/TCL_ERROR to indicate success/failure.
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 int
 Itcl_AddOptionCmd(
-    ClientData clientData,   /* infoPtr */
+    void *clientData,        /* infoPtr */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
     Tcl_Obj *const objv[])   /* argument objects */
@@ -1452,7 +1431,7 @@ Itcl_AddOptionCmd(
     infoPtr = (ItclObjectInfo *)clientData;
     ItclShowArgs(1, "Itcl_AddOptionCmd", objc, objv);
     if (objc < 4) {
-        Tcl_WrongNumArgs(interp, 1, objv, 
+        Tcl_WrongNumArgs(interp, 1, objv,
 	        "className protection option optionName ...");
 	return TCL_ERROR;
     }
@@ -1462,7 +1441,7 @@ Itcl_AddOptionCmd(
 	        "\" not found", NULL);
         return TCL_ERROR;
     }
-    iclsPtr = Tcl_GetHashValue(hPtr);
+    iclsPtr = (ItclClass *)Tcl_GetHashValue(hPtr);
     protectionStr = Tcl_GetString(objv[2]);
     pLevel = -1;
     if (strcmp(protectionStr, "public") == 0) {
@@ -1479,7 +1458,7 @@ Itcl_AddOptionCmd(
 	        NULL);
         return TCL_ERROR;
     }
-    Itcl_PushStack((ClientData)iclsPtr, &infoPtr->clsStack);
+    Itcl_PushStack(iclsPtr, &infoPtr->clsStack);
     result = Itcl_ClassOptionCmd(clientData, interp, objc-2, objv+2);
     Itcl_PopStack(&infoPtr->clsStack);
     if (result != TCL_OK) {
@@ -1495,7 +1474,7 @@ Itcl_AddOptionCmd(
  *
  *  Used to build an option for an [incr Tcl] object
  *
- *  Syntax: ::itcl::addobjectoption <object> <protection> option <optionSpec> 
+ *  Syntax: ::itcl::addobjectoption <object> <protection> option <optionSpec>
  *     ?-default <defaultValue>?
  *     ?-configuremethod <configuremethod>?
  *     ?-validatemethod <validatemethod>?
@@ -1508,10 +1487,10 @@ Itcl_AddOptionCmd(
  *  Returns TCL_OK/TCL_ERROR to indicate success/failure.
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 int
 Itcl_AddObjectOptionCmd(
-    ClientData clientData,   /* infoPtr */
+    void *clientData,        /* infoPtr */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
     Tcl_Obj *const objv[])   /* argument objects */
@@ -1530,11 +1509,11 @@ Itcl_AddObjectOptionCmd(
     infoPtr = (ItclObjectInfo *)clientData;
     ItclShowArgs(1, "Itcl_AddObjectOptionCmd", objc, objv);
     if (objc < 4) {
-        Tcl_WrongNumArgs(interp, 1, objv, 
+        Tcl_WrongNumArgs(interp, 1, objv,
 	        "objectName protection option optionName ...");
 	return TCL_ERROR;
     }
-    
+
     cmd = Tcl_FindCommand(interp, Tcl_GetString(objv[1]), NULL, 0);
     if (cmd == NULL) {
 	Tcl_AppendResult(interp, "object \"", Tcl_GetString(objv[1]),
@@ -1547,7 +1526,7 @@ Itcl_AddObjectOptionCmd(
 	        "\" not found", NULL);
         return TCL_ERROR;
     }
-    ioPtr = Tcl_GetHashValue(hPtr);
+    ioPtr = (ItclObject *)Tcl_GetHashValue(hPtr);
     protectionStr = Tcl_GetString(objv[2]);
     pLevel = -1;
     if (strcmp(protectionStr, "public") == 0) {
@@ -1596,10 +1575,10 @@ Itcl_AddObjectOptionCmd(
  *  Returns TCL_OK/TCL_ERROR to indicate success/failure.
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 int
 Itcl_AddDelegatedOptionCmd(
-    ClientData clientData,   /* infoPtr */
+    void *clientData,        /* infoPtr */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
     Tcl_Obj *const objv[])   /* argument objects */
@@ -1616,11 +1595,11 @@ Itcl_AddDelegatedOptionCmd(
     infoPtr = (ItclObjectInfo *)clientData;
     ItclShowArgs(1, "Itcl_AddDelegatedOptionCmd", objc, objv);
     if (objc < 4) {
-        Tcl_WrongNumArgs(interp, 1, objv, 
+        Tcl_WrongNumArgs(interp, 1, objv,
 	        "className protection option optionName ...");
 	return TCL_ERROR;
     }
-    
+
     cmd = Tcl_FindCommand(interp, Tcl_GetString(objv[1]), NULL, 0);
     if (cmd == NULL) {
 	Tcl_AppendResult(interp, "object \"", Tcl_GetString(objv[1]),
@@ -1633,7 +1612,7 @@ Itcl_AddDelegatedOptionCmd(
 	        "\" not found", NULL);
         return TCL_ERROR;
     }
-    ioPtr = Tcl_GetHashValue(hPtr);
+    ioPtr = (ItclObject *)Tcl_GetHashValue(hPtr);
     result = Itcl_HandleDelegateOptionCmd(interp, ioPtr, NULL, &idoPtr,
             objc-3, objv+3);
     if (result != TCL_OK) {
@@ -1656,10 +1635,10 @@ Itcl_AddDelegatedOptionCmd(
  *  Returns TCL_OK/TCL_ERROR to indicate success/failure.
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 int
 Itcl_AddDelegatedFunctionCmd(
-    ClientData clientData,   /* infoPtr */
+    void *clientData,        /* infoPtr */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
     Tcl_Obj *const objv[])   /* argument objects */
@@ -1680,11 +1659,11 @@ Itcl_AddDelegatedFunctionCmd(
     infoPtr = (ItclObjectInfo *)clientData;
     ItclShowArgs(1, "Itcl_AddDelegatedFunctionCmd", objc, objv);
     if (objc < 4) {
-        Tcl_WrongNumArgs(interp, 1, objv, 
+        Tcl_WrongNumArgs(interp, 1, objv,
 	        "className protection method/proc functionName ...");
 	return TCL_ERROR;
     }
-    
+
     cmd = Tcl_FindCommand(interp, Tcl_GetString(objv[1]), NULL, 0);
     if (cmd == NULL) {
 	Tcl_AppendResult(interp, "object \"", Tcl_GetString(objv[1]),
@@ -1697,7 +1676,7 @@ Itcl_AddDelegatedFunctionCmd(
 	        "\" not found", NULL);
         return TCL_ERROR;
     }
-    ioPtr = Tcl_GetHashValue(hPtr);
+    ioPtr = (ItclObject *)Tcl_GetHashValue(hPtr);
     result = Itcl_HandleDelegateMethodCmd(interp, ioPtr, NULL, &idmPtr,
             objc-3, objv+3);
     if (result != TCL_OK) {
@@ -1734,10 +1713,10 @@ Itcl_AddDelegatedFunctionCmd(
  *  Returns TCL_OK/TCL_ERROR to indicate success/failure.
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 int
 Itcl_AddComponentCmd(
-    ClientData clientData,   /* infoPtr */
+    TCL_UNUSED(void *),      /* infoPtr */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
     Tcl_Obj *const objv[])   /* argument objects */
@@ -1750,23 +1729,19 @@ Itcl_AddComponentCmd(
     Tcl_CallFrame frame;
     Tcl_Var varPtr;
     ItclVarLookup *vlookup;
-    ItclObjectInfo *infoPtr;
     ItclObject *contextIoPtr;
     ItclClass *contextIclsPtr;
     ItclComponent *icPtr;
     ItclVariable *ivPtr;
     const char *varName;
-    const char *name;
     int isNew;
     int result;
-    int type = VAR_TYPE_VARIABLE;
 
     result = TCL_OK;
     contextIoPtr = NULL;
-    infoPtr = (ItclObjectInfo *)clientData;
     ItclShowArgs(1, "Itcl_AddComponentCmd", objc, objv);
     if (objc < 3) {
-        Tcl_WrongNumArgs(interp, 1, objv, 
+        Tcl_WrongNumArgs(interp, 1, objv,
 	        "objectName componentName");
 	return TCL_ERROR;
     }
@@ -1788,19 +1763,17 @@ Itcl_AddComponentCmd(
 		Tcl_GetString(objv[1]), "\"", NULL);
         return TCL_ERROR;
     }
-    if (ItclCreateComponent(interp, contextIclsPtr, objv[2], 0,
+    if (ItclCreateComponent(interp, contextIclsPtr, objv[2], /* not common */0,
             &icPtr) != TCL_OK) {
         return TCL_ERROR;
     }
+    ItclAddClassComponentDictInfo(interp, contextIclsPtr, icPtr);
     contextIclsPtr->numVariables++;
     Tcl_SetHashValue(hPtr, icPtr);
     Tcl_DStringInit(&buffer);
     Tcl_DStringAppend(&buffer, ITCL_VARIABLES_NAMESPACE, -1);
-    name = Tcl_GetString(contextIoPtr->namePtr);
-    if ((name[0] != ':') && (name[1] != ':')) {
-            Tcl_DStringAppend(&buffer, "::", 2);
-    }
-    Tcl_DStringAppend(&buffer, name, -1);
+    Tcl_DStringAppend(&buffer,
+	    (Tcl_GetObjectNamespace(contextIoPtr->oPtr))->fullName, -1);
     Tcl_DStringAppend(&buffer, contextIclsPtr->nsPtr->fullName, -1);
     varNsPtr = Tcl_FindNamespace(interp, Tcl_DStringValue(&buffer),
         NULL, 0);
@@ -1810,7 +1783,7 @@ Itcl_AddComponentCmd(
 	        " \"", Tcl_GetString(objv[2]), "\"in class variables", NULL);
         return TCL_ERROR;
     }
-    ivPtr = Tcl_GetHashValue(hPtr);
+    ivPtr = (ItclVariable *)Tcl_GetHashValue(hPtr);
     /* add entry to the virtual tables */
     vlookup = (ItclVarLookup *)ckalloc(sizeof(ItclVarLookup));
     vlookup->ivPtr = ivPtr;
@@ -1824,9 +1797,6 @@ Itcl_AddComponentCmd(
     vlookup->accessible = (ivPtr->protection != ITCL_PRIVATE ||
         ivPtr->iclsPtr == contextIclsPtr);
 
-    if (ivPtr->flags & ITCL_COMMON) {
-        type = VAR_TYPE_COMMON;
-    }
     vlookup->varNum = contextIclsPtr->numInstanceVars++;
     /*
      *  Create all possible names for this variable and enter
@@ -1847,18 +1817,13 @@ Itcl_AddComponentCmd(
             Tcl_DStringValue(&buffer), &isNew);
 
         if (isNew) {
-            Tcl_SetHashValue(hPtr, (ClientData)vlookup);
+            Tcl_SetHashValue(hPtr, vlookup);
             vlookup->usage++;
 
             if (!vlookup->leastQualName) {
-                vlookup->leastQualName =
+                vlookup->leastQualName = (char *)
                     Tcl_GetHashKey(&contextIclsPtr->resolveVars, hPtr);
             }
-#ifdef NEW_PROTO_RESOLVER
-            Itcl_RegisterClassVariable(contextIclsPtr->infoPtr->interp,
-                     contextIclsPtr->nsPtr, Tcl_DStringValue(&buffer),
-                     vlookup->classVarInfoPtr);
-#endif
         }
 
         if (nsPtr == NULL) {
@@ -1896,6 +1861,7 @@ Itcl_AddComponentCmd(
     hPtr = Tcl_CreateHashEntry(&contextIoPtr->objectVariables,
             (char *)ivPtr, &isNew);
     if (isNew) {
+	Itcl_PreserveVar(varPtr);
         Tcl_SetHashValue(hPtr, varPtr);
     } else {
     }
@@ -1911,16 +1877,15 @@ Itcl_AddComponentCmd(
  *  Returns TCL_OK/TCL_ERROR to indicate success/failure.
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 int
 Itcl_SetComponentCmd(
-    ClientData clientData,   /* infoPtr */
+    TCL_UNUSED(void *),      /* infoPtr */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
     Tcl_Obj *const objv[])   /* argument objects */
 {
     FOREACH_HASH_DECLS;
-    ItclObjectInfo *infoPtr;
     ItclClass *iclsPtr;
     ItclObject *contextIoPtr;
     ItclClass *contextIclsPtr;
@@ -1933,14 +1898,13 @@ Itcl_SetComponentCmd(
 
     result = TCL_OK;
     contextIoPtr = NULL;
-    infoPtr = (ItclObjectInfo *)clientData;
     ItclShowArgs(1, "Itcl_SetComponentCmd", objc, objv);
     if (objc < 4) {
-        Tcl_WrongNumArgs(interp, 1, objv, 
+        Tcl_WrongNumArgs(interp, 1, objv,
 	        "objectName componentName value");
 	return TCL_ERROR;
     }
-    name = Tcl_GetStringFromObj(objv[1], (int*)NULL);
+    name = Tcl_GetString(objv[1]);
     if (Itcl_FindObject(interp, name, &contextIoPtr) != TCL_OK) {
         return TCL_ERROR;
     }
@@ -1963,7 +1927,7 @@ Itcl_SetComponentCmd(
 	        "\" has no component \"", Tcl_GetString(objv[2]), "\"", NULL);
         return TCL_ERROR;
     }
-    icPtr = Tcl_GetHashValue(hPtr);
+    icPtr = (ItclComponent *)Tcl_GetHashValue(hPtr);
     val = ItclGetInstanceVar(interp, Tcl_GetString(icPtr->namePtr), NULL,
             contextIoPtr, contextIclsPtr);
     if ((val != NULL) && (strlen(val) != 0)) {
@@ -1999,19 +1963,17 @@ Itcl_SetComponentCmd(
  *  Returns TCL_OK/TCL_ERROR to indicate success/failure.
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 int
 Itcl_ExtendedClassCmd(
-    ClientData clientData,   /* infoPtr */
+    void *clientData,        /* infoPtr */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
     Tcl_Obj *const objv[])   /* argument objects */
 {
     ItclClass *iclsPtr;
-    ItclObjectInfo *infoPtr;
     int result;
 
-    infoPtr = (ItclObjectInfo *)clientData;
     ItclShowArgs(1, "Itcl_ExtendedClassCmd", objc-1, objv);
     result = ItclClassBaseCmd(clientData, interp, ITCL_ECLASS, objc, objv,
             &iclsPtr);
@@ -2034,20 +1996,18 @@ Itcl_ExtendedClassCmd(
  *  Returns TCL_OK/TCL_ERROR to indicate success/failure.
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 int
 Itcl_TypeClassCmd(
-    ClientData clientData,   /* infoPtr */
+    void *clientData,        /* infoPtr */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
     Tcl_Obj *const objv[])   /* argument objects */
 {
     Tcl_Obj *objPtr;
     ItclClass *iclsPtr;
-    ItclObjectInfo *infoPtr;
     int result;
 
-    infoPtr = (ItclObjectInfo *)clientData;
     ItclShowArgs(1, "Itcl_TypeClassCmd", objc-1, objv);
     result = ItclClassBaseCmd(clientData, interp, ITCL_TYPE, objc, objv,
             &iclsPtr);
@@ -2066,8 +2026,7 @@ Itcl_TypeClassCmd(
     result = Tcl_EvalObjEx(interp, objPtr, 0);
     Tcl_DecrRefCount(objPtr);
     objPtr = Tcl_NewStringObj(iclsPtr->nsPtr->fullName, -1);
-    Tcl_SetResult(interp, Tcl_GetString(objPtr), TCL_VOLATILE);
-    Tcl_DecrRefCount(objPtr);
+    Tcl_SetObjResult(interp, objPtr);
     return result;
 }
 
@@ -2080,10 +2039,10 @@ Itcl_TypeClassCmd(
  *  Returns TCL_OK/TCL_ERROR to indicate success/failure.
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 int
 Itcl_ClassHullTypeCmd(
-    ClientData clientData,   /* infoPtr */
+    void *clientData,        /* infoPtr */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
     Tcl_Obj *const objv[])   /* argument objects */
@@ -2092,9 +2051,7 @@ Itcl_ClassHullTypeCmd(
     ItclObjectInfo *infoPtr;
     const char *hullTypeName;
     int correctArg;
-    int result;
 
-    result = TCL_OK;
     infoPtr = (ItclObjectInfo *)clientData;
     iclsPtr = (ItclClass*)Itcl_PeekStack(&infoPtr->clsStack);
     ItclShowArgs(1, "Itcl_ClassHullTypeCmd", objc-1, objv);
@@ -2167,10 +2124,10 @@ Itcl_ClassHullTypeCmd(
  *  Returns TCL_OK/TCL_ERROR to indicate success/failure.
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 int
 Itcl_ClassWidgetClassCmd(
-    ClientData clientData,   /* infoPtr */
+    void *clientData,        /* infoPtr */
     Tcl_Interp *interp,      /* current interpreter */
     int objc,                /* number of arguments */
     Tcl_Obj *const objv[])   /* argument objects */

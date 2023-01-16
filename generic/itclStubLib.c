@@ -8,6 +8,9 @@
 
 #undef Itcl_InitStubs
 
+MODULE_SCOPE const ItclStubs *itclStubsPtr;
+MODULE_SCOPE const ItclIntStubs *itclIntStubsPtr;
+
 const ItclStubs *itclStubsPtr = NULL;
 const ItclIntStubs *itclIntStubsPtr = NULL;
 
@@ -35,14 +38,14 @@ Itcl_InitStubs(
 {
     const char *packageName = "itcl";
     const char *errMsg = NULL;
-    ClientData clientData = NULL;
+    void *clientData = NULL;
     const ItclStubs *stubsPtr;
     const ItclIntStubs *intStubsPtr;
     const char *actualVersion;
-    
+
     actualVersion =
 	    Tcl_PkgRequireEx(interp, packageName, version, exact, &clientData);
-    stubsPtr = clientData;
+    stubsPtr = (const ItclStubs *)clientData;
     if ((actualVersion == NULL) || (clientData == NULL)) {
         return NULL;
     }

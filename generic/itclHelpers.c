@@ -1,8 +1,8 @@
 /*
  * itclHelpers.c --
  *
- * This file contains the C-implemeted part of 
- * Itcl 
+ * This file contains the C-implemeted part of
+ * Itcl
  *
  * Copyright (c) 2007 by Arnulf P. Wiedemann
  *
@@ -26,10 +26,10 @@ void
 ItclShowArgs(
     int level,
     const char *str,
-    int objc,
+    size_t objc,
     Tcl_Obj * const* objv)
 {
-    int i;
+    size_t i;
 
     if (level > _itcl_debug_level) {
         return;
@@ -77,21 +77,21 @@ int
 ItclCreateArgList(
     Tcl_Interp *interp,		/* interpreter managing this function */
     const char *str,		/* string representing argument list */
-    int *argcPtr,		/* number of mandatory arguments */
-    int *maxArgcPtr,		/* number of arguments parsed */
+    Tcl_Size *argcPtr,		/* number of mandatory arguments */
+    Tcl_Size *maxArgcPtr,		/* number of arguments parsed */
     Tcl_Obj **usagePtr,         /* store usage message for arguments here */
     ItclArgList **arglistPtrPtr,
     				/* returns pointer to parsed argument list */
-    ItclMemberFunc *mPtr,
+    TCL_UNUSED(ItclMemberFunc *),
     const char *commandName)
 {
-    int argc;
-    int defaultArgc;
+    Tcl_Size argc;
+    Tcl_Size defaultArgc;
     const char **argv;
     const char **defaultArgv;
     ItclArgList *arglistPtr;
     ItclArgList *lastArglistPtr;
-    int i;
+    Tcl_Size i;
     int hadArgsArgument;
     int result;
 
@@ -128,11 +128,12 @@ ItclCreateArgList(
 		            commandName,
 			    "\" has argument with no name", NULL);
 		} else {
-	            char buf[10];
-		    sprintf(buf, "%d", i);
+		    char buf[TCL_INTEGER_SPACE];
+		    sprintf(buf, "%" ITCL_Z_MODIFIER "d", i);
 		    Tcl_AppendResult(interp, "argument #", buf,
 		            " has no name", NULL);
 		}
+		ckfree((char *) defaultArgv);
 	        result = TCL_ERROR;
 	        break;
 	    }
@@ -140,14 +141,16 @@ ItclCreateArgList(
 	        Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
 	            "too many fields in argument specifier \"",
 		    argv[i], "\"",
-		    (char*)NULL);
+		    NULL);
+		ckfree((char *) defaultArgv);
 	        result = TCL_ERROR;
 	        break;
 	    }
 	    if (strstr(defaultArgv[0],"::")) {
 	        Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
 		        "bad argument name \"", defaultArgv[0], "\"",
-			(char*)NULL);
+			NULL);
+		ckfree((char *) defaultArgv);
 		result = TCL_ERROR;
 		break;
 	    }
@@ -159,8 +162,9 @@ ItclCreateArgList(
 	        lastArglistPtr->nextPtr = arglistPtr;
 	        Tcl_AppendToObj(*usagePtr, " ", 1);
 	    }
-	    arglistPtr->namePtr = 
+	    arglistPtr->namePtr =
 	            Tcl_NewStringObj(defaultArgv[0], -1);
+	    Tcl_IncrRefCount(arglistPtr->namePtr);
 	    (*maxArgcPtr)++;
 	    if (defaultArgc == 1) {
 		(*argcPtr)++;
@@ -173,15 +177,18 @@ ItclCreateArgList(
 	            Tcl_AppendToObj(*usagePtr, defaultArgv[0], -1);
 	        }
 	    } else {
-	        arglistPtr->defaultValuePtr = 
+	        arglistPtr->defaultValuePtr =
 		        Tcl_NewStringObj(defaultArgv[1], -1);
+		Tcl_IncrRefCount(arglistPtr->defaultValuePtr);
 	        Tcl_AppendToObj(*usagePtr, "?", 1);
 	        Tcl_AppendToObj(*usagePtr, defaultArgv[0], -1);
 	        Tcl_AppendToObj(*usagePtr, "?", 1);
 	    }
             lastArglistPtr = arglistPtr;
 	    i++;
+	    ckfree((char *) defaultArgv);
         }
+	ckfree((char *) argv);
     }
     /*
      *  If anything went wrong, destroy whatever arguments were
@@ -240,14 +247,10 @@ ItclDeleteArgList(
 int
 Itcl_EvalArgs(
     Tcl_Interp *interp,      /* current interpreter */
-    int objc,                /* number of arguments */
+    Tcl_Size objc,          /* number of arguments */
     Tcl_Obj *const objv[])   /* argument objects */
 {
-    int result;
     Tcl_Command cmd;
-    int cmdlinec;
-    Tcl_Obj **cmdlinev;
-    Tcl_Obj *cmdlinePtr = NULL;
     Tcl_CmdInfo infoPtr;
 
     /*
@@ -257,44 +260,26 @@ Itcl_EvalArgs(
      */
     cmd = Tcl_GetCommandFromObj(interp, objv[0]);
 
-    cmdlinec = objc;
-    cmdlinev = (Tcl_Obj	**) objv;
-
     /*
-     * If the command is still not found, handle it with the
-     * "unknown" proc.
+     * If the command is not found, we have no hope of a truly fast
+     * dispatch, so the smart thing to do is just fall back to the
+     * conventional tools.
      */
     if (cmd == NULL) {
-        cmd = Tcl_FindCommand(interp, "unknown",
-            (Tcl_Namespace *) NULL, /*flags*/ TCL_GLOBAL_ONLY);
-
-        if (cmd == NULL) {
-            Tcl_ResetResult(interp);
-            Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
-                "invalid command name \"",
-                Tcl_GetStringFromObj(objv[0], NULL), "\"", NULL);
-            return TCL_ERROR;
-        }
-
-        cmdlinePtr = Itcl_CreateArgs(interp, "unknown", objc, objv);
-        Tcl_ListObjGetElements(NULL, cmdlinePtr, &cmdlinec, &cmdlinev);
+	return Tcl_EvalObjv(interp, objc, objv, 0);
     }
 
     /*
      *  Finally, invoke the command's Tcl_ObjCmdProc.  Be careful
      *  to pass in the proper client data.
      */
-    Tcl_ResetResult(interp);
-    result = Tcl_GetCommandInfoFromToken(cmd, &infoPtr);
-    if (result == 1) {
-        result = (infoPtr.objProc)(infoPtr.objClientData, interp,
-                cmdlinec, cmdlinev);
+    Tcl_GetCommandInfoFromToken(cmd, &infoPtr);
+#if TCL_MAJOR_VERSION > 8
+    if (infoPtr.isNativeObjectProc == 2) {
+	return infoPtr.objProc2(infoPtr.objClientData2, interp, objc, objv);
     }
-
-    if (cmdlinePtr) {
-        Tcl_DecrRefCount(cmdlinePtr);
-    }
-    return result;
+#endif
+    return infoPtr.objProc(infoPtr.objClientData, interp, objc, objv);
 }
 
 
@@ -316,26 +301,21 @@ Itcl_EvalArgs(
  */
 Tcl_Obj*
 Itcl_CreateArgs(
-    Tcl_Interp *interp,      /* current interpreter */
+    TCL_UNUSED(Tcl_Interp *),/* current interpreter */
     const char *string,      /* first command word */
-    int objc,                /* number of arguments */
+    Tcl_Size objc,          /* number of arguments */
     Tcl_Obj *const objv[])   /* argument objects */
 {
-    int i;
+    Tcl_Size i;
     Tcl_Obj *listPtr;
-    Tcl_Obj *objPtr;
 
     ItclShowArgs(1, "Itcl_CreateArgs", objc, objv);
-    listPtr = Tcl_NewListObj(0, (Tcl_Obj**)NULL);
-    objPtr = Tcl_NewStringObj("my", -1);
-    Tcl_IncrRefCount(objPtr);
-    Tcl_ListObjAppendElement((Tcl_Interp*)NULL, listPtr, objPtr);
-    objPtr = Tcl_NewStringObj(string, -1);
-    Tcl_IncrRefCount(objPtr);
-    Tcl_ListObjAppendElement((Tcl_Interp*)NULL, listPtr, objPtr);
+    listPtr = Tcl_NewListObj(objc+2, NULL);
+    Tcl_ListObjAppendElement(NULL, listPtr, Tcl_NewStringObj("my", -1));
+    Tcl_ListObjAppendElement(NULL, listPtr, Tcl_NewStringObj(string, -1));
 
     for (i=0; i < objc; i++) {
-        Tcl_ListObjAppendElement((Tcl_Interp*)NULL, listPtr, objv[i]);
+        Tcl_ListObjAppendElement(NULL, listPtr, objv[i]);
     }
     return listPtr;
 }
@@ -348,82 +328,33 @@ Itcl_CreateArgs(
 
 int
 ItclEnsembleSubCmd(
-    ClientData clientData,
+    TCL_UNUSED(void *),
     Tcl_Interp *interp,
-    const char *ensembleName,
+    TCL_UNUSED(const char *),
     int objc,
     Tcl_Obj *const *objv,
-    const char *functionName)
+    TCL_UNUSED(const char *))
 {
     int result;
     Tcl_Obj **newObjv;
     int isRootEnsemble;
+
     ItclShowArgs(2, functionName, objc, objv);
 
-    newObjv = (Tcl_Obj **)ckalloc(sizeof(Tcl_Obj *)*(objc+1));
-    isRootEnsemble = Itcl_InitRewriteEnsemble(interp, 1, 2, objc, objv);
-    newObjv[0] = Tcl_NewStringObj("::info", -1);
+    newObjv = (Tcl_Obj **)ckalloc(sizeof(Tcl_Obj *)*(objc));
+    isRootEnsemble = Itcl_InitRewriteEnsemble(interp, 1, 1, objc, objv);
+    newObjv[0] = Tcl_NewStringObj("::itcl::builtin::Info", -1);
     Tcl_IncrRefCount(newObjv[0]);
-    newObjv[1] = Tcl_NewStringObj("itclinfo", -1);
-    Tcl_IncrRefCount(newObjv[1]);
     if (objc > 1) {
-        memcpy(newObjv+2, objv+1, sizeof(Tcl_Obj *) * (objc-1));
+        memcpy(newObjv+1, objv+1, sizeof(Tcl_Obj *) * (objc-1));
     }
-    result = Tcl_EvalObjv(interp, objc+1, newObjv, TCL_EVAL_INVOKE);
+    result = Tcl_EvalObjv(interp, objc, newObjv, TCL_EVAL_INVOKE);
     Tcl_DecrRefCount(newObjv[0]);
-    Tcl_DecrRefCount(newObjv[1]);
     ckfree((char *)newObjv);
     Itcl_ResetRewriteEnsemble(interp, isRootEnsemble);
     return result;
 }
 
-
-/*
- * ------------------------------------------------------------------------
- *  ItclTraceUnsetVar()
- * ------------------------------------------------------------------------
- */
-
-char *
-ItclTraceUnsetVar(
-    ClientData clientData,
-    Tcl_Interp *interp,
-    const char *name1,
-    const char *name2,
-    int flags)
-{
-#ifdef NOTDEF
-    IctlVarTraceInfo *tracePtr;
-    Tcl_HashEntry *hPtr;
-#endif
-
-    if (name2 != NULL) {
-        /* unsetting of an array element nothing to do */
-	return NULL;
-    }
-    /* also when unsetting variables, they stay alive until the class
-     * or object is teared down!!
-     */
-#ifdef NOTDEF
-    tracePtr = (IctlVarTraceInfo *)clientData;
-    if (tracePtr->flags & ITCL_TRACE_CLASS) {
-        hPtr = Tcl_FindHashEntry(&tracePtr->iclsPtr->classCommons,
-	        (char *)tracePtr->ivPtr);
-	if (hPtr != NULL) {
-	    Tcl_DeleteHashEntry(hPtr);
-	}
-    }
-    if (tracePtr->flags & ITCL_TRACE_OBJECT) {
-        hPtr = Tcl_FindHashEntry(&tracePtr->ioPtr->objectVariables,
-	        (char *)tracePtr->ivPtr);
-	if (hPtr != NULL) {
-	    Tcl_DeleteHashEntry(hPtr);
-	}
-    }
-    ckfree((char *)tracePtr);
-#endif
-    return NULL;
-}
 
 /*
  * ------------------------------------------------------------------------
@@ -437,7 +368,7 @@ ItclCapitalize(
 {
     Tcl_Obj *objPtr;
     char buf[2];
-    
+
     sprintf(buf, "%c", toupper(UCHAR(*str)));
     buf[1] = '\0';
     objPtr = Tcl_NewStringObj(buf, -1);
@@ -483,15 +414,16 @@ AddDictEntry(
     Tcl_Obj *valuePtr)
 {
     Tcl_Obj *keyPtr;
+    int code;
 
     if (valuePtr == NULL) {
         return TCL_OK;
     }
     keyPtr = Tcl_NewStringObj(keyStr, -1);
-    if (Tcl_DictObjPut(interp, dictPtr, keyPtr, valuePtr) != TCL_OK) {
-        return TCL_ERROR;
-    }
-    return TCL_OK;
+    Tcl_IncrRefCount(keyPtr);
+    code = Tcl_DictObjPut(interp, dictPtr, keyPtr, valuePtr);
+    Tcl_DecrRefCount(keyPtr);
+    return code;
 }
 
 /*
@@ -750,8 +682,8 @@ ItclAddObjectsDictInfo(
     }
     objPtr = Tcl_NewObj();
     Tcl_GetCommandFullName(interp, ioPtr->accessCmd, objPtr);
-    Tcl_IncrRefCount(objPtr);
     if (AddDictEntry(interp, valuePtr2, "-command", objPtr) != TCL_OK) {
+	Tcl_DecrRefCount(objPtr);
         return TCL_ERROR;
     }
     keyPtr = ioPtr->namePtr;
@@ -759,9 +691,11 @@ ItclAddObjectsDictInfo(
         return TCL_ERROR;
     }
     if (newValue1) {
-        if (Tcl_DictObjPut(interp, dictPtr, keyPtr1, valuePtr1) != TCL_OK) {
-            return TCL_ERROR;
-        }
+	/* Cannot fail. Screened non-dicts earlier. */
+        Tcl_DictObjPut(interp, dictPtr, keyPtr1, valuePtr1);
+    } else {
+	/* Don't leak the key val... */
+	Tcl_DecrRefCount(keyPtr1);
     }
     Tcl_SetVar2Ex(interp, ITCL_NAMESPACE"::internal::dicts::objects",
             NULL, dictPtr, 0);
@@ -793,28 +727,36 @@ ItclDeleteObjectsDictInfo(
     }
     keyPtr1 = Tcl_NewStringObj("instances", -1);
     if (Tcl_DictObjGet(interp, dictPtr, keyPtr1, &valuePtr) != TCL_OK) {
+	Tcl_DecrRefCount(keyPtr1);
         return TCL_ERROR;
     }
     if (valuePtr == NULL) {
 	/* looks like no object has been registered yet
 	 * so ignore and return OK */
+	Tcl_DecrRefCount(keyPtr1);
         return TCL_OK;
     }
     keyPtr = ioPtr->namePtr;
     if (Tcl_DictObjGet(interp, valuePtr, keyPtr, &valuePtr1) != TCL_OK) {
+	Tcl_DecrRefCount(keyPtr1);
         return TCL_ERROR;
     }
     if (valuePtr1 == NULL) {
 	/* looks like the object has not been constructed successfully
 	 * so ignore and return OK */
+	Tcl_DecrRefCount(keyPtr1);
         return TCL_OK;
     }
     if (Tcl_DictObjRemove(interp, valuePtr, keyPtr) != TCL_OK) {
+	Tcl_DecrRefCount(keyPtr1);
         return TCL_ERROR;
     }
     if (Tcl_DictObjPut(interp, dictPtr, keyPtr1, valuePtr) != TCL_OK) {
+	/* This is very likely impossible. non-dict already screened. */
+	Tcl_DecrRefCount(keyPtr1);
         return TCL_ERROR;
     }
+    Tcl_DecrRefCount(keyPtr1);
     Tcl_SetVar2Ex(interp, ITCL_NAMESPACE"::internal::dicts::objects",
             NULL, dictPtr, 0);
     return TCL_OK;
@@ -1015,6 +957,9 @@ ItclAddDelegatedOptionDictInfo(
     listPtr = Tcl_NewListObj(0, NULL);
     haveExceptions = 0;
     FOREACH_HASH(keyPtr, value, &idoPtr->exceptions) {
+        if (value == NULL) {
+            /* FIXME need code here */
+        }
         haveExceptions = 1;
 	Tcl_ListObjAppendElement(interp, listPtr, keyPtr);
     }
@@ -1107,6 +1052,9 @@ ItclAddClassComponentDictInfo(
     if (icPtr->haveKeptOptions) {
         listPtr = Tcl_NewListObj(0, NULL);
         FOREACH_HASH(keyPtr, value, &icPtr->keptOptions) {
+            if (value == NULL) {
+                /* FIXME need code here */
+            }
 	    Tcl_ListObjAppendElement(interp, listPtr, keyPtr);
         }
         if (AddDictEntry(interp, valuePtr2, "-keptoptions", listPtr)
@@ -1153,7 +1101,7 @@ ItclAddClassVariableDictInfo(
     keyPtr = iclsPtr->fullNamePtr;
     dictPtr = Tcl_GetVar2Ex(interp,
              ITCL_NAMESPACE"::internal::dicts::classVariables",
-	     NULL, 0);
+	     NULL, TCL_GLOBAL_ONLY);
     if (dictPtr == NULL) {
         Tcl_AppendResult(interp, "cannot get dict ", ITCL_NAMESPACE,
 	        "::internal::dicts::classVariables", NULL);
@@ -1278,7 +1226,7 @@ ItclAddClassVariableDictInfo(
     }
     Tcl_SetVar2Ex(interp,
             ITCL_NAMESPACE"::internal::dicts::classVariables",
-            NULL, dictPtr, 0);
+            NULL, dictPtr, TCL_GLOBAL_ONLY);
     return TCL_OK;
 }
 
@@ -1304,7 +1252,7 @@ ItclAddClassFunctionDictInfo(
 
     dictPtr = Tcl_GetVar2Ex(interp,
              ITCL_NAMESPACE"::internal::dicts::classFunctions",
-	     NULL, 0);
+	     NULL, TCL_GLOBAL_ONLY);
     if (dictPtr == NULL) {
         Tcl_AppendResult(interp, "cannot get dict ", ITCL_NAMESPACE,
 	        "::internal::dicts::classFunctions", NULL);
@@ -1384,11 +1332,6 @@ ItclAddClassFunctionDictInfo(
         Tcl_ListObjAppendElement(interp, listPtr,
 	        Tcl_NewStringObj("have_body", -1));
     }
-    if (imPtr->flags & ITCL_CONINIT) {
-        haveFlags = 1;
-        Tcl_ListObjAppendElement(interp, listPtr,
-	        Tcl_NewStringObj("constructor_init", -1));
-    }
     if (haveFlags) {
         if (AddDictEntry(interp, valuePtr2, "-flags", listPtr) != TCL_OK) {
             return TCL_ERROR;
@@ -1443,7 +1386,7 @@ ItclAddClassFunctionDictInfo(
     }
     Tcl_SetVar2Ex(interp,
             ITCL_NAMESPACE"::internal::dicts::classFunctions",
-            NULL, dictPtr, 0);
+            NULL, dictPtr, TCL_GLOBAL_ONLY);
     return TCL_OK;
 }
 
@@ -1516,6 +1459,9 @@ ItclAddClassDelegatedFunctionDictInfo(
     haveExceptions = 0;
     listPtr = Tcl_NewListObj(0, NULL);
     FOREACH_HASH(keyPtr, value, &idmPtr->exceptions) {
+        if (value == NULL) {
+            /* FIXME need code here */
+        }
         haveExceptions = 1;
         if (Tcl_ListObjAppendElement(interp, listPtr, keyPtr) != TCL_OK) {
             return TCL_ERROR;

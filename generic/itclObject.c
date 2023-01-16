@@ -29,35 +29,46 @@
  * See the file "license.terms" for information on usage and redistribution
  * of this file, and for a DISCLAIMER OF ALL WARRANTIES.
  */
+#include <tclInt.h>
 #include "itclInt.h"
 
 /*
  *  FORWARD DECLARATIONS
  */
-static char* ItclTraceThisVar(ClientData cdata, Tcl_Interp *interp,
+static char* ItclTraceThisVar(void *cdata, Tcl_Interp *interp,
 	const char *name1, const char *name2, int flags);
-static char* ItclTraceOptionVar(ClientData cdata, Tcl_Interp *interp,
+static char* ItclTraceTypeVar(void *cdata, Tcl_Interp *interp,
 	const char *name1, const char *name2, int flags);
-static char* ItclTraceComponentVar(ClientData cdata, Tcl_Interp *interp,
+static char* ItclTraceSelfVar(void *cdata, Tcl_Interp *interp,
 	const char *name1, const char *name2, int flags);
-static char* ItclTraceItclHullVar(ClientData cdata, Tcl_Interp *interp,
+static char* ItclTraceSelfnsVar(void *cdata, Tcl_Interp *interp,
+	const char *name1, const char *name2, int flags);
+static char* ItclTraceWinVar(void *cdata, Tcl_Interp *interp,
+	const char *name1, const char *name2, int flags);
+static char* ItclTraceOptionVar(void *cdata, Tcl_Interp *interp,
+	const char *name1, const char *name2, int flags);
+static char* ItclTraceComponentVar(void *cdata, Tcl_Interp *interp,
+	const char *name1, const char *name2, int flags);
+static char* ItclTraceItclHullVar(void *cdata, Tcl_Interp *interp,
 	const char *name1, const char *name2, int flags);
 
-static void ItclDestroyObject(ClientData clientData);
-static void ItclFreeObject(char * clientData);
+static void ItclDestroyObject(void *clientData);
+static void FreeObject(char *cdata);
 
 static int ItclDestructBase(Tcl_Interp *interp, ItclObject *contextObj,
         ItclClass *contextClass, int flags);
 
 static int ItclInitObjectVariables(Tcl_Interp *interp, ItclObject *ioPtr,
-        ItclClass *iclsPtr, const char *name);
+        ItclClass *iclsPtr);
 static int ItclInitObjectCommands(Tcl_Interp *interp, ItclObject *ioPtr,
         ItclClass *iclsPtr, const char *name);
 static int ItclInitExtendedClassOptions(Tcl_Interp *interp, ItclObject *ioPtr);
 static int ItclInitObjectOptions(Tcl_Interp *interp, ItclObject *ioPtr,
-        ItclClass *iclsPtr, const char *name);
+        ItclClass *iclsPtr);
 static const char * GetConstructorVar(Tcl_Interp *interp, ItclClass *iclsPtr,
         const char *varName);
+static ItclClass * GetClassFromClassName(Tcl_Interp *interp,
+	const char *className, ItclClass *iclsPtr);
 
 
 /*
@@ -69,12 +80,23 @@ static const char * GetConstructorVar(Tcl_Interp *interp, ItclClass *iclsPtr,
  */
 void
 ItclDeleteObjectMetadata(
-    ClientData clientData)
+    void *clientData)
 {
-    /*
-     * nothing to to yet, as there are only ItclClass or ItclObject pointers
-     * stored, which are freed elsewhere
-     */
+    ItclObject *ioPtr = (ItclObject *)clientData;
+    Tcl_HashEntry *hPtr;
+
+    if (ioPtr == NULL) return;		/* Safety */
+    if (ioPtr->oPtr == NULL) return;	/* Safety */
+
+    hPtr = Tcl_FindHashEntry(&ioPtr->infoPtr->instances,
+	(Tcl_GetObjectNamespace(ioPtr->oPtr))->fullName);
+
+    if (hPtr == NULL) return;
+
+    if (clientData != Tcl_GetHashValue(hPtr)) {
+	Tcl_Panic("invalid instances entry");
+    }
+    Tcl_DeleteHashEntry(hPtr);
 }
 
 /*
@@ -86,13 +108,13 @@ ItclDeleteObjectMetadata(
 
 static void
 ObjectRenamedTrace(
-    ClientData clientData,      /* The object being deleted. */
-    Tcl_Interp *interp,         /* The interpreter containing the object. */
-    const char *oldName,        /* What the object was (last) called. */
+    void *clientData,           /* The object being deleted. */
+    TCL_UNUSED(Tcl_Interp *),   /* The interpreter containing the object. */
+    TCL_UNUSED(const char *),   /* What the object was (last) called. */
     const char *newName,        /* Always NULL ??. not for itk!! */
-    int flags)                  /* Why was the object deleted? */
+    TCL_UNUSED(int))            /* Why was the object deleted? */
 {
-    ItclObject *ioPtr = clientData;
+    ItclObject *ioPtr = (ItclObject *)clientData;
     Itcl_InterpState istate;
 
     if (newName != NULL) {
@@ -119,6 +141,42 @@ ObjectRenamedTrace(
 
 /*
  * ------------------------------------------------------------------------
+ *  Itcl_CreateObject()
+ *
+ */
+int
+Itcl_CreateObject(
+    Tcl_Interp *interp,      /* interpreter mananging new object */
+    const char* name,        /* name of new object */
+    ItclClass *iclsPtr,      /* class for new object */
+    Tcl_Size objc,          /* number of arguments */
+    Tcl_Obj *const objv[],   /* argument objects */
+    ItclObject **rioPtr)     /* the created object */
+{
+    int result;
+    ItclObjectInfo * infoPtr;
+
+    result = ItclCreateObject(interp, name, iclsPtr, objc, objv);
+    if (result == TCL_OK) {
+        if (!(iclsPtr->flags & (ITCL_TYPE|ITCL_WIDGET|ITCL_WIDGETADAPTOR))) {
+            Tcl_ResetResult(interp);
+            Tcl_AppendResult(interp, name, NULL);
+        }
+    }
+    if (rioPtr != NULL) {
+        if (result == TCL_OK) {
+            infoPtr = (ItclObjectInfo *)Tcl_GetAssocData(interp,
+			                    ITCL_INTERP_DATA, NULL);
+            *rioPtr = infoPtr->lastIoPtr;
+	} else {
+            *rioPtr = NULL;
+	}
+    }
+    return result;
+}
+
+/*
+ * ------------------------------------------------------------------------
  *  ItclCreateObject()
  *
  *  Creates a new object instance belonging to the given class.
@@ -141,7 +199,7 @@ ItclCreateObject(
     Tcl_Interp *interp,      /* interpreter mananging new object */
     const char* name,        /* name of new object */
     ItclClass *iclsPtr,        /* class for new object */
-    int objc,                /* number of arguments */
+    size_t objc,                /* number of arguments */
     Tcl_Obj *const objv[])   /* argument objects */
 {
     int result = TCL_OK;
@@ -152,6 +210,7 @@ ItclCreateObject(
     Tcl_HashEntry *hPtr;
     Tcl_Obj **newObjv;
     Tcl_Obj *objPtr;
+    Tcl_Obj *saveNsNamePtr = NULL;
     ItclObjectInfo *infoPtr;
     ItclObject *saveCurrIoPtr;
     ItclObject *ioPtr;
@@ -159,10 +218,11 @@ ItclCreateObject(
     const char *nsName;
     const char *objName;
     char unique[256];    /* buffer used for unique part of object names */
-    int newObjc;
     int newEntry;
     ItclResolveInfo *resolveInfoPtr;
-    char str[100];
+    /* objv[1]: class name */
+    /* objv[2]: class full name */
+    /* objv[3]: object name */
 
     infoPtr = NULL;
     ItclShowArgs(1, "ItclCreateObject", objc, objv);
@@ -178,28 +238,38 @@ ItclCreateObject(
         }
     }
     /* just init for the case of none ItclWidget objects */
-    newObjc = objc;
     newObjv = (Tcl_Obj **)objv;
     infoPtr = iclsPtr->infoPtr;
+
+    if (infoPtr != NULL) {
+      infoPtr->lastIoPtr = NULL;
+    }
     /*
      *  Create a new object and initialize it.
      */
-    ioPtr = (ItclObject*)ckalloc(sizeof(ItclObject));
-    memset(ioPtr, 0, sizeof(ItclObject));
+    ioPtr = (ItclObject*)Itcl_Alloc(sizeof(ItclObject));
+    Itcl_EventuallyFree(ioPtr, (Tcl_FreeProc *)FreeObject);
     ioPtr->iclsPtr = iclsPtr;
     ioPtr->interp = interp;
     ioPtr->infoPtr = infoPtr;
-    Itcl_PreserveData((ClientData)iclsPtr);
+    ItclPreserveClass(iclsPtr);
 
     ioPtr->constructed = (Tcl_HashTable*)ckalloc(sizeof(Tcl_HashTable));
     Tcl_InitObjHashTable(ioPtr->constructed);
+
+    ioPtr->oPtr = Tcl_NewObjectInstance(interp, iclsPtr->clsPtr, NULL,
+            /* nsName */ NULL, /* objc */ -1, /* objv */ NULL, /* skip */ 0);
+    if (ioPtr->oPtr == NULL) {
+	Itcl_Free(ioPtr);
+        return TCL_ERROR;
+    }
 
     /*
      *  Add a command to the current namespace with the object name.
      *  This is done before invoking the constructors so that the
      *  command can be used during construction to query info.
      */
-    Itcl_PreserveData((ClientData)ioPtr);
+    Itcl_PreserveData(ioPtr);
 
     ioPtr->namePtr = Tcl_NewStringObj(name, -1);
     Tcl_IncrRefCount(ioPtr->namePtr);
@@ -215,8 +285,8 @@ ItclCreateObject(
     Tcl_IncrRefCount(ioPtr->origNamePtr);
     Tcl_DStringInit(&buffer);
     Tcl_DStringAppend(&buffer, ITCL_VARIABLES_NAMESPACE, -1);
-    Tcl_DStringAppend(&buffer, "::", 2);
-    Tcl_DStringAppend(&buffer, Tcl_GetString(ioPtr->namePtr), -1);
+    Tcl_DStringAppend(&buffer,
+	    (Tcl_GetObjectNamespace(ioPtr->oPtr))->fullName, -1);
     ioPtr->varNsNamePtr = Tcl_NewStringObj(Tcl_DStringValue(&buffer), -1);
     Tcl_IncrRefCount(ioPtr->varNsNamePtr);
     Tcl_DStringFree(&buffer);
@@ -229,8 +299,7 @@ ItclCreateObject(
     Tcl_InitObjHashTable(&ioPtr->objectMethodVariables);
     Tcl_InitHashTable(&ioPtr->contextCache, TCL_ONE_WORD_KEYS);
 
-    Itcl_PreserveData((ClientData)ioPtr);  /* while we're using this... */
-    Itcl_EventuallyFree((ClientData)ioPtr, ItclFreeObject);
+    Itcl_PreserveData(ioPtr);
 
     /*
      *  Install the class namespace and object context so that
@@ -242,12 +311,14 @@ ItclCreateObject(
      * and set all the init values for variables
      */
 
-    if (ItclInitObjectVariables(interp, ioPtr, iclsPtr, name) != TCL_OK) {
+    if (ItclInitObjectVariables(interp, ioPtr, iclsPtr) != TCL_OK) {
+	ioPtr->hadConstructorError = 11;
 	result = TCL_ERROR;
         goto errorReturn;
     }
     if (ItclInitObjectCommands(interp, ioPtr, iclsPtr, name) != TCL_OK) {
 	Tcl_AppendResult(interp, "error in ItclInitObjectCommands", NULL);
+	ioPtr->hadConstructorError = 12;
 	result = TCL_ERROR;
         goto errorReturn;
     }
@@ -256,9 +327,10 @@ ItclCreateObject(
 	if (iclsPtr->flags & (ITCL_ECLASS|ITCL_TYPE|ITCL_WIDGET|
 	        ITCL_WIDGETADAPTOR)) {
             ItclInitExtendedClassOptions(interp, ioPtr);
-            if (ItclInitObjectOptions(interp, ioPtr, iclsPtr, name) != TCL_OK) {
+            if (ItclInitObjectOptions(interp, ioPtr, iclsPtr) != TCL_OK) {
 	        Tcl_AppendResult(interp, "error in ItclInitObjectOptions",
 		        NULL);
+	        ioPtr->hadConstructorError = 13;
 	        result = TCL_ERROR;
                 goto errorReturn;
             }
@@ -267,15 +339,26 @@ ItclCreateObject(
 	        != TCL_OK) {
 	    Tcl_AppendResult(interp,
 	            "error in ItclInitObjectMethodVariables", NULL);
+	    ioPtr->hadConstructorError = 14;
 	    result = TCL_ERROR;
             goto errorReturn;
         }
+
+	if (iclsPtr->flags & (ITCL_WIDGET|ITCL_WIDGETADAPTOR)) {
+	    saveNsNamePtr = Tcl_GetVar2Ex(interp,
+		    "::itcl::internal::varNsName", name, 0);
+	    if (saveNsNamePtr) {
+		Tcl_IncrRefCount(saveNsNamePtr);
+	    }
+	    Tcl_SetVar2Ex(interp, "::itcl::internal::varNsName", name,
+		    ioPtr->varNsNamePtr, 0);
+	}
+
     }
 
     saveCurrIoPtr = infoPtr->currIoPtr;
     infoPtr->currIoPtr = ioPtr;
     if (iclsPtr->flags & ITCL_WIDGET) {
-        newObjc = objc;
         newObjv = (Tcl_Obj **)ckalloc(sizeof(Tcl_Obj *) * (objc + 5));
         newObjv[0] = Tcl_NewStringObj(
                 "::itcl::internal::commands::hullandoptionsinstall", -1);
@@ -304,16 +387,7 @@ ItclCreateObject(
         Tcl_DecrRefCount(newObjv[4]);
         ckfree((char *)newObjv);
         if (result != TCL_OK) {
-            goto errorReturn;
-        }
-    }
-    if (iclsPtr->flags & (ITCL_WIDGET|ITCL_WIDGETADAPTOR)) {
-        if (ItclInitObjectMethodVariables(interp, ioPtr, iclsPtr, name)
-	        != TCL_OK) {
-	    Tcl_AppendResult(interp,
-	            "error in ItclInitObjectMethodVariables", NULL);
-	    infoPtr->currIoPtr = saveCurrIoPtr;
-	    result = TCL_ERROR;
+	    ioPtr->hadConstructorError = 15;
             goto errorReturn;
         }
     }
@@ -330,10 +404,10 @@ ItclCreateObject(
         do {
 	    Tcl_CmdInfo dummy;
 
-            sprintf(unique,"%.200s_%d", name, iclsPtr->unique++);
+            sprintf(unique,"%.200s_%" ITCL_Z_MODIFIER "u", name, iclsPtr->unique++);
             unique[0] = tolower(UCHAR(unique[0]));
 
-            Tcl_DStringTrunc(&buffer, 0);
+            Tcl_DStringSetLength(&buffer, 0);
             Tcl_DStringAppend(&buffer, unique, -1);
             objName = Tcl_DStringValue(&buffer);
 
@@ -348,21 +422,21 @@ ItclCreateObject(
         } while (1);
 	ioPtr->createNamePtr = Tcl_NewStringObj(objName, -1);
     }
-    ioPtr->oPtr = Tcl_NewObjectInstance(interp, iclsPtr->clsPtr, objName,
-            iclsPtr->nsPtr->fullName, /* objc */-1, /* objv */NULL,
-	    /* skip */0);
-    if (ioPtr->oPtr == NULL) {
-	infoPtr->currIoPtr = saveCurrIoPtr;
-        ItclDeleteObjectVariablesNamespace(interp, ioPtr);
-        Itcl_ReleaseData((ClientData)ioPtr);
-        Itcl_ReleaseData((ClientData)ioPtr);
-        return TCL_ERROR;
+
+    {
+	Tcl_Obj *tmp = Tcl_NewObj();
+
+	Tcl_GetCommandFullName(interp, Tcl_GetObjectCommand(ioPtr->oPtr), tmp);
+	Itcl_RenameCommand(interp, Tcl_GetString(tmp), objName);
+	Tcl_TraceCommand(interp, objName,
+            TCL_TRACE_RENAME|TCL_TRACE_DELETE, ObjectRenamedTrace, ioPtr);
+	Tcl_DecrRefCount(tmp);
     }
     Tcl_ObjectSetMethodNameMapper(ioPtr->oPtr, ItclMapMethodNameProc);
 
     ioPtr->accessCmd = Tcl_GetObjectCommand(ioPtr->oPtr);
     Tcl_GetCommandInfoFromToken(ioPtr->accessCmd, &cmdInfo);
-    cmdInfo.deleteProc = (void *)ItclDestroyObject;
+    cmdInfo.deleteProc = ItclDestroyObject;
     cmdInfo.deleteData = ioPtr;
     Tcl_SetCommandInfoFromToken(ioPtr->accessCmd, &cmdInfo);
     ioPtr->resolvePtr = (Tcl_Resolve *)ckalloc(sizeof(Tcl_Resolve));
@@ -373,8 +447,6 @@ ItclCreateObject(
     resolveInfoPtr->flags = ITCL_RESOLVE_OBJECT;
     resolveInfoPtr->ioPtr = ioPtr;
     ioPtr->resolvePtr->clientData = resolveInfoPtr;
-    Tcl_TraceCommand(interp, Tcl_GetString(ioPtr->namePtr),
-            TCL_TRACE_RENAME|TCL_TRACE_DELETE, ObjectRenamedTrace, ioPtr);
 
     Tcl_ObjectSetMetadata(ioPtr->oPtr, iclsPtr->infoPtr->object_meta_type,
             ioPtr);
@@ -382,27 +454,18 @@ ItclCreateObject(
     /* make the object known, if it is used in the constructor already! */
     hPtr = Tcl_CreateHashEntry(&iclsPtr->infoPtr->objectCmds,
         (char*)ioPtr->accessCmd, &newEntry);
-    Tcl_SetHashValue(hPtr, (ClientData)ioPtr);
+    Tcl_SetHashValue(hPtr, ioPtr);
 
     hPtr = Tcl_CreateHashEntry(&iclsPtr->infoPtr->objects,
         (char*)ioPtr, &newEntry);
-    Tcl_SetHashValue(hPtr, (ClientData)ioPtr);
-    hPtr = Tcl_CreateHashEntry(&iclsPtr->infoPtr->objectNames,
-            (char*)ioPtr->namePtr, &newEntry);
-    Tcl_SetHashValue(hPtr, (ClientData)ioPtr);
+    Tcl_SetHashValue(hPtr, ioPtr);
 
-    /* make the object instance known, for use as unique key if the object */
-    /* is renamed. Used by mytypemethod etc. */
-    sprintf(str, "ItclInst%d", iclsPtr->infoPtr->numInstances);
-    /* FIXME need to free that when deleting object and to remove the entries!! */
-    objPtr = Tcl_NewStringObj(str, -1);
+    /* Use the TclOO object namespaces as a unique key in case the
+     * object is renamed. Used by mytypemethod, etc. */
+
     hPtr = Tcl_CreateHashEntry(&iclsPtr->infoPtr->instances,
-        (char*)objPtr, &newEntry);
-    Tcl_SetHashValue(hPtr, (ClientData)ioPtr);
-    hPtr = Tcl_CreateHashEntry(&iclsPtr->infoPtr->objectInstances,
-        (char*)ioPtr, &newEntry);
-    Tcl_SetHashValue(hPtr, (ClientData)objPtr);
-    iclsPtr->infoPtr->numInstances++;
+	(Tcl_GetObjectNamespace(ioPtr->oPtr))->fullName, &newEntry);
+    Tcl_SetHashValue(hPtr, ioPtr);
 
     /*
      *  Now construct the object.  Look for a constructor in the
@@ -422,13 +485,6 @@ ItclCreateObject(
     }
     ioPtr->hadConstructorError = -1;
     if (result != TCL_OK) {
-        int constructorStackSize;
-	/* clean up the constructor stack */
-        constructorStackSize = Itcl_GetStackSize(&infoPtr->constructorStack);
-	while (constructorStackSize > 0) {
-	    Itcl_PopStack(&infoPtr->constructorStack);
-	    constructorStackSize--;
-	}
         istate = Itcl_SaveInterpState(interp, result);
 	ItclDeleteObjectVariablesNamespace(interp, ioPtr);
 	if (ioPtr->accessCmd != (Tcl_Command) NULL) {
@@ -438,7 +494,7 @@ ItclCreateObject(
         result = Itcl_RestoreInterpState(interp, istate);
 	infoPtr->currIoPtr = saveCurrIoPtr;
 	/* need this for 2 ReleaseData at errorReturn!! */
-        Itcl_PreserveData(ioPtr);
+	Itcl_PreserveData(ioPtr);
         goto errorReturn;
     } else {
 	/* a constructor cannot return a result as the object name
@@ -453,13 +509,13 @@ ItclCreateObject(
      */
     objPtr = Tcl_NewStringObj("constructor", -1);
     if (Tcl_FindHashEntry(&iclsPtr->functions, (char *)objPtr) == NULL) {
-        result = Itcl_ConstructBase(interp, ioPtr, iclsPtr, objc, objv);
+        result = Itcl_ConstructBase(interp, ioPtr, iclsPtr);
     }
     Tcl_DecrRefCount(objPtr);
 
     if (iclsPtr->flags & ITCL_ECLASS) {
         ItclInitExtendedClassOptions(interp, ioPtr);
-        if (ItclInitObjectOptions(interp, ioPtr, iclsPtr, name) != TCL_OK) {
+        if (ItclInitObjectOptions(interp, ioPtr, iclsPtr) != TCL_OK) {
                 Tcl_AppendResult(interp, "error in ItclInitObjectOptions",
 	        NULL);
             result = TCL_ERROR;
@@ -487,18 +543,26 @@ ItclCreateObject(
 	}
         result = Itcl_RestoreInterpState(interp, istate);
 	/* need this for 2 ReleaseData at errorReturn!! */
-        Itcl_PreserveData(ioPtr);
+	Itcl_PreserveData(ioPtr);
         goto errorReturn;
     }
 
     if (iclsPtr->flags & ITCL_WIDGETADAPTOR) {
+
+	if (saveNsNamePtr) {
+	    Tcl_SetVar2Ex(interp, "::itcl::internal::varNsName", name,
+		    saveNsNamePtr, 0);
+	    Tcl_DecrRefCount(saveNsNamePtr);
+	    saveNsNamePtr = NULL;
+	}
+
         Itcl_RenameCommand(interp, objName, name);
         ioPtr->createNamePtr = NULL;
         Tcl_TraceCommand(interp, Tcl_GetString(ioPtr->namePtr),
                 TCL_TRACE_RENAME|TCL_TRACE_DELETE, ObjectRenamedTrace, ioPtr);
     }
     if (iclsPtr->flags & (ITCL_WIDGETADAPTOR)) {
-        /* 
+        /*
          * set all the init values for options
          */
 
@@ -531,7 +595,7 @@ ItclCreateObject(
 	    }
             result = Itcl_RestoreInterpState(interp, istate);
 	    /* need this for 2 ReleaseData at errorReturn!! */
-            Itcl_PreserveData(ioPtr);
+	    Itcl_PreserveData(ioPtr);
             goto errorReturn;
 	}
     }
@@ -546,10 +610,6 @@ ItclCreateObject(
      *  its accessCmd member is NULL.
      */
     if (result == TCL_OK && (ioPtr->accessCmd != NULL))  {
-	ClientData pmPtr;
-	Tcl_Obj *namePtr;
-	Tcl_Obj *argumentPtr;
-	Tcl_Obj *bodyPtr;
 
 	if (!(ioPtr->iclsPtr->flags & ITCL_CLASS)) {
 	    result = DelegationInstall(interp, ioPtr, iclsPtr);
@@ -559,26 +619,23 @@ ItclCreateObject(
 	}
         hPtr = Tcl_CreateHashEntry(&iclsPtr->infoPtr->objectCmds,
                 (char*)ioPtr->accessCmd, &newEntry);
-        Tcl_SetHashValue(hPtr, (ClientData)ioPtr);
+        Tcl_SetHashValue(hPtr, ioPtr);
         hPtr = Tcl_CreateHashEntry(&iclsPtr->infoPtr->objects,
                 (char*)ioPtr, &newEntry);
-        Tcl_SetHashValue(hPtr, (ClientData)ioPtr);
+        Tcl_SetHashValue(hPtr, ioPtr);
 
-        /* add the objects unknow command to handle all unknown sub commands */
-	namePtr = Tcl_NewStringObj("unknown", -1);
-	Tcl_IncrRefCount(namePtr);
-	argumentPtr = Tcl_NewStringObj("args", -1);
-	Tcl_IncrRefCount(argumentPtr);
-	bodyPtr = Tcl_NewStringObj("uplevel 1 ::itcl::builtin::objectunknown ",
-	        -1);
-	Tcl_AppendToObj(bodyPtr, Tcl_GetString(ioPtr->namePtr), -1);
-	Tcl_AppendToObj(bodyPtr, " $args", -1);
-	Tcl_IncrRefCount(bodyPtr);
-        Itcl_NewProcMethod(interp, ioPtr->oPtr, NULL, NULL, ItclProcErrorProc, 
-	    (ItclMemberFunc *)ioPtr, namePtr, argumentPtr, bodyPtr, &pmPtr);
-	Tcl_DecrRefCount(namePtr);
-	Tcl_DecrRefCount(argumentPtr);
-	Tcl_DecrRefCount(bodyPtr);
+	/*
+	 * This is an inelegant hack, left behind until the need for it
+	 * can be eliminated by getting the inheritance tree right.
+	 */
+
+        if (iclsPtr->flags
+		& (ITCL_ECLASS|ITCL_TYPE|ITCL_WIDGET|ITCL_WIDGETADAPTOR)) {
+	    Tcl_NewInstanceMethod(interp, ioPtr->oPtr,
+		    Tcl_NewStringObj("unknown", -1), 0,
+		    &itclRootMethodType, (void *)ItclUnknownGuts);
+	}
+
         if (iclsPtr->flags & (ITCL_TYPE|ITCL_WIDGETADAPTOR)) {
             Tcl_Obj *objPtr = Tcl_NewObj();
             Tcl_GetCommandFullName(interp, ioPtr->accessCmd, objPtr);
@@ -625,11 +682,12 @@ ItclCreateObject(
     if (infoPtr != NULL) {
         infoPtr->currIoPtr = saveCurrIoPtr;
     }
+    infoPtr->lastIoPtr = ioPtr;
     Tcl_DeleteHashTable(ioPtr->constructed);
     ckfree((char*)ioPtr->constructed);
     ioPtr->constructed = NULL;
     ItclAddObjectsDictInfo(interp, ioPtr);
-    Itcl_ReleaseData((ClientData)ioPtr);
+    Itcl_ReleaseData(ioPtr);
     return result;
 
 errorReturn:
@@ -638,7 +696,14 @@ errorReturn:
      *  Destroy the "constructed" table in the object data, since
      *  it is no longer needed.
      */
+	if (saveNsNamePtr) {
+	    Tcl_SetVar2Ex(interp, "::itcl::internal::varNsName", name,
+		    saveNsNamePtr, 0);
+	    Tcl_DecrRefCount(saveNsNamePtr);
+	    saveNsNamePtr = NULL;
+	}
     if (infoPtr != NULL) {
+        infoPtr->lastIoPtr = ioPtr;
         infoPtr->currIoPtr = saveCurrIoPtr;
     }
     if (ioPtr->constructed != NULL) {
@@ -647,8 +712,8 @@ errorReturn:
         ioPtr->constructed = NULL;
     }
     ItclDeleteObjectVariablesNamespace(interp, ioPtr);
-    Itcl_ReleaseData((ClientData)ioPtr);
-    Itcl_ReleaseData((ClientData)ioPtr);
+    Itcl_ReleaseData(ioPtr);
+    Itcl_ReleaseData(ioPtr);
     return result;
 }
 
@@ -663,86 +728,11 @@ errorReturn:
  */
 static int
 ItclInitObjectCommands(
-   Tcl_Interp *interp,
-   ItclObject *ioPtr,
-   ItclClass *iclsPtr,
-   const char *name)
+   TCL_UNUSED(Tcl_Interp *),
+   TCL_UNUSED(ItclObject *),
+   TCL_UNUSED(ItclClass *),
+   TCL_UNUSED(const char *))
 {
-#ifdef NEW_PROTO_RESOLVER
-    Tcl_HashEntry *hPtr;
-    Tcl_HashEntry *entry;
-    Tcl_HashSearch place;
-    Tcl_Command cmdPtr;
-    Tcl_Obj *objPtr;
-    Tcl_Namespace *nsPtr;
-    ItclClass *iclsPtr2;
-    ItclClass *lastIclsPtr;
-    ItclHierIter hier;
-    ItclMemberFunc *imPtr;
-    ItclCmdLookup *clookup;
-    ItclCmdLookup *info_clookup;
-
-    info_clookup = NULL;
-    lastIclsPtr = NULL;
-    Tcl_ResetResult(interp);
-    Itcl_InitHierIter(&hier, iclsPtr);
-    iclsPtr2 = Itcl_AdvanceHierIter(&hier);
-    while (iclsPtr2 != NULL) {
-        entry = Tcl_FirstHashEntry(&iclsPtr2->functions, &place);
-        while (entry) {
-            imPtr = (ItclMemberFunc *)Tcl_GetHashValue(entry);
-	    hPtr = Tcl_FindHashEntry(&iclsPtr->resolveCmds,
-	            (char *)imPtr->namePtr);
-	    clookup = (ItclCmdLookup *)Tcl_GetHashValue(hPtr);
-	    cmdPtr = imPtr->accessCmd;
-            nsPtr = iclsPtr->nsPtr;
-	    if ((imPtr->flags & ITCL_COMMON) == 0) {
-		cmdPtr = Itcl_RegisterObjectCommand(interp, ioPtr,
-		        Tcl_GetString(imPtr->namePtr), clookup->classCmdInfoPtr,
-			cmdPtr, iclsPtr->nsPtr);
-            } else {
-		cmdPtr = Itcl_RegisterObjectCommand(interp, ioPtr,
-		        Tcl_GetString(imPtr->namePtr), clookup->classCmdInfoPtr,
-			cmdPtr, iclsPtr->nsPtr);
-	    }
-            entry = Tcl_NextHashEntry(&place);
-        }
-        lastIclsPtr = iclsPtr2;
-        iclsPtr2 = Itcl_AdvanceHierIter(&hier);
-    }
-
-    /* add some builtin functions to every class!! */
-    Itcl_InitHierIter(&hier, iclsPtr);
-    iclsPtr2 = Itcl_AdvanceHierIter(&hier);
-    while (iclsPtr2 != NULL) {
-	objPtr = Tcl_NewStringObj("info", -1);
-	hPtr = Tcl_FindHashEntry(&iclsPtr2->resolveCmds, objPtr);
-	Tcl_DecrRefCount(objPtr);
-	if (hPtr != NULL) {
-	    clookup = (ItclCmdLookup *)Tcl_GetHashValue(hPtr);
-	    cmdPtr = Itcl_RegisterObjectCommand(interp, ioPtr, "info",
-	            clookup->classCmdInfoPtr, cmdPtr, iclsPtr->nsPtr);
-	}
-	objPtr = Tcl_NewStringObj("isa", -1);
-	hPtr = Tcl_FindHashEntry(&iclsPtr2->resolveCmds, objPtr);
-	Tcl_DecrRefCount(objPtr);
-	if (hPtr != NULL) {
-	    clookup = (ItclCmdLookup *)Tcl_GetHashValue(hPtr);
-	    cmdPtr = Itcl_RegisterObjectCommand(interp, ioPtr, "isa",
-	            clookup->classCmdInfoPtr, cmdPtr, iclsPtr->nsPtr);
-	}
-	objPtr = Tcl_NewStringObj("setget", -1);
-	hPtr = Tcl_FindHashEntry(&iclsPtr2->resolveCmds, objPtr);
-	Tcl_DecrRefCount(objPtr);
-	if (hPtr != NULL) {
-	    clookup = (ItclCmdLookup *)Tcl_GetHashValue(hPtr);
-	    cmdPtr = Itcl_RegisterObjectCommand(interp, ioPtr, "setget",
-	            clookup->classCmdInfoPtr, cmdPtr, iclsPtr->nsPtr);
-	}
-        iclsPtr2 = Itcl_AdvanceHierIter(&hier);
-    }
-    Itcl_DeleteHierIter(&hier);
-#endif
     return TCL_OK;
 }
 
@@ -759,8 +749,7 @@ static int
 ItclInitObjectVariables(
    Tcl_Interp *interp,
    ItclObject *ioPtr,
-   ItclClass *iclsPtr,
-   const char *name)
+   ItclClass *iclsPtr)
 {
     Tcl_DString buffer;
     Tcl_DString buffer2;
@@ -775,20 +764,17 @@ ItclInitObjectVariables(
     ItclHierIter hier;
     ItclVariable *ivPtr;
     ItclComponent *icPtr;
-    ItclVarLookup *vlookup;
     const char *varName;
     const char *inheritComponentName;
     int itclOptionsIsSet;
     int isNew;
-    int numInheritComponents;
 
     ivPtr = NULL;
     /*
      * create all the variables for each class in the
-     * ::itcl::variables::<object>::<class> namespace as an
+     * ::itcl::variables::<object namespace>::<class> namespace as an
      * undefined variable using the Tcl "variable xx" command
      */
-    numInheritComponents = 0;
     itclOptionsIsSet = 0;
     inheritComponentName = NULL;
     Itcl_InitHierIter(&hier, iclsPtr);
@@ -797,10 +783,8 @@ ItclInitObjectVariables(
     while (iclsPtr2 != NULL) {
 	Tcl_DStringInit(&buffer);
 	Tcl_DStringAppend(&buffer, ITCL_VARIABLES_NAMESPACE, -1);
-	if ((name[0] != ':') && (name[1] != ':')) {
-             Tcl_DStringAppend(&buffer, "::", 2);
-	}
-	Tcl_DStringAppend(&buffer, name, -1);
+	Tcl_DStringAppend(&buffer,
+		(Tcl_GetObjectNamespace(ioPtr->oPtr))->fullName, -1);
 	Tcl_DStringAppend(&buffer, iclsPtr2->nsPtr->fullName, -1);
 	varNsPtr = Tcl_FindNamespace(interp, Tcl_DStringValue(&buffer),
 	        NULL, 0);
@@ -822,10 +806,8 @@ ItclInitObjectVariables(
 		itclOptionsIsSet = 1;
                 Tcl_DStringInit(&buffer2);
 	        Tcl_DStringAppend(&buffer2, ITCL_VARIABLES_NAMESPACE, -1);
-	        if ((name[0] != ':') && (name[1] != ':')) {
-                     Tcl_DStringAppend(&buffer2, "::", 2);
-	        }
-	        Tcl_DStringAppend(&buffer2, name, -1);
+		Tcl_DStringAppend(&buffer,
+			(Tcl_GetObjectNamespace(ioPtr->oPtr))->fullName, -1);
 	        varNsPtr2 = Tcl_FindNamespace(interp,
 		        Tcl_DStringValue(&buffer2), NULL, 0);
 	        if (varNsPtr2 == NULL) {
@@ -839,14 +821,10 @@ ItclInitObjectVariables(
                         /*isProcCallFrame*/0) != TCL_OK) {
 		    goto errorCleanup2;
                 }
-                if (Tcl_SetVar2(interp, "itcl_options", "",
-	                "", TCL_NAMESPACE_ONLY) == NULL) {
-		    goto errorCleanup;
-                }
                 Tcl_TraceVar2(interp, "itcl_options",
                         NULL,
                         TCL_TRACE_READS|TCL_TRACE_WRITES,
-                        ItclTraceOptionVar, (ClientData)ioPtr);
+                        ItclTraceOptionVar, ioPtr);
 	        Itcl_PopCallFrame(interp);
                 if (Itcl_PushCallFrame(interp, &frame, varNsPtr,
                         /*isProcCallFrame*/0) != TCL_OK) {
@@ -864,7 +842,7 @@ ItclInitObjectVariables(
 			    Tcl_GetString(ivPtr->iclsPtr->namePtr), NULL);
 		    goto errorCleanup;
 		}
-		icPtr = Tcl_GetHashValue(hPtr2);
+		icPtr = (ItclComponent *)Tcl_GetHashValue(hPtr2);
 		if (icPtr->flags & ITCL_COMPONENT_INHERIT) {
 		    if (inheritComponentName != NULL) {
 		        Tcl_AppendResult(interp, "object \"",
@@ -875,7 +853,7 @@ ItclInitObjectVariables(
 				"\" now component \"",
 				Tcl_GetString(icPtr->namePtr), "\"", NULL);
 		        goto errorCleanup;
-				
+
 		    } else {
 		        inheritComponentName = Tcl_GetString(icPtr->namePtr);
 		    }
@@ -895,39 +873,23 @@ ItclInitObjectVariables(
 		    goto errorCleanup;
                 }
 	    }
-            hPtr2 = Tcl_FindHashEntry(&ivPtr->iclsPtr->resolveVars, varName);
+            hPtr2 = ItclResolveVarEntry(ivPtr->iclsPtr, varName);
             if (hPtr2 == NULL) {
-                Tcl_Panic("before Itcl_RegisterObjectVariable hPtr2 == NULL!\n");
+                hPtr = Tcl_NextHashEntry(&place);
+	        continue;
             }
-	    vlookup = Tcl_GetHashValue(hPtr2);
 	    if ((ivPtr->flags & ITCL_COMMON) == 0) {
-                IctlVarTraceInfo *traceInfoPtr;
-#ifndef NEW_PROTO_RESOLVER
                 varPtr = Tcl_NewNamespaceVar(interp, varNsPtr,
                         Tcl_GetString(ivPtr->namePtr));
-#else
-		varPtr = Itcl_RegisterObjectVariable(interp, ioPtr,
-		        Tcl_GetString(ivPtr->namePtr), vlookup->classVarInfoPtr,
-			NULL, varNsPtr);
-#endif
 	        hPtr2 = Tcl_CreateHashEntry(&ioPtr->objectVariables,
 		        (char *)ivPtr, &isNew);
 	        if (isNew) {
+		    Itcl_PreserveVar(varPtr);
 		    Tcl_SetHashValue(hPtr2, varPtr);
-		} else {
 		}
-                traceInfoPtr = (IctlVarTraceInfo *)ckalloc(
-		        sizeof(IctlVarTraceInfo));
-                memset (traceInfoPtr, 0, sizeof(IctlVarTraceInfo));
-                traceInfoPtr->flags = ITCL_TRACE_OBJECT;
-                traceInfoPtr->ioPtr = ioPtr;
-                traceInfoPtr->iclsPtr = iclsPtr2;
-                traceInfoPtr->ivPtr = ivPtr;
-                Tcl_TraceVar2(interp, Tcl_GetString(ivPtr->namePtr), NULL,
-                       TCL_TRACE_UNSETS, ItclTraceUnsetVar,
-                       (ClientData)traceInfoPtr);
 	        if (ivPtr->flags & (ITCL_THIS_VAR|ITCL_TYPE_VAR|
 		        ITCL_SELF_VAR|ITCL_SELFNS_VAR|ITCL_WIN_VAR)) {
+                    int isDone = 0;
 		    if (Tcl_SetVar2(interp, varName, NULL,
 		        "", TCL_NAMESPACE_ONLY) == NULL) {
                         Tcl_AppendResult(interp, "INTERNAL ERROR cannot set",
@@ -935,19 +897,46 @@ ItclInitObjectVariables(
 				varName, "\"\n", NULL);
 		        goto errorCleanup;
 	            }
+	        if (ivPtr->flags & ITCL_THIS_VAR) {
 	            Tcl_TraceVar2(interp, varName, NULL,
 		        TCL_TRACE_READS|TCL_TRACE_WRITES, ItclTraceThisVar,
-		        (ClientData)ioPtr);
-	        } else {
+		        ioPtr);
+                    isDone = 1;
+		}
+	        if (!isDone && ivPtr->flags & ITCL_TYPE_VAR) {
+	            Tcl_TraceVar2(interp, varName, NULL,
+		        TCL_TRACE_READS|TCL_TRACE_WRITES, ItclTraceTypeVar,
+		        ioPtr);
+                    isDone = 1;
+		}
+	        if (!isDone && ivPtr->flags & ITCL_SELF_VAR) {
+	            Tcl_TraceVar2(interp, varName, NULL,
+		        TCL_TRACE_READS|TCL_TRACE_WRITES, ItclTraceSelfVar,
+		        ioPtr);
+                    isDone = 1;
+		}
+	        if (!isDone && ivPtr->flags & ITCL_SELFNS_VAR) {
+	            Tcl_TraceVar2(interp, varName, NULL,
+		        TCL_TRACE_READS|TCL_TRACE_WRITES, ItclTraceSelfnsVar,
+		        ioPtr);
+                    isDone = 1;
+		}
+	        if (!isDone && ivPtr->flags & ITCL_WIN_VAR) {
+	            Tcl_TraceVar2(interp, varName, NULL,
+		        TCL_TRACE_READS|TCL_TRACE_WRITES, ItclTraceWinVar,
+		        ioPtr);
+                    isDone = 1;
+		}
+		} else {
 	            if (ivPtr->flags & ITCL_HULL_VAR) {
 	                Tcl_TraceVar2(interp, varName, NULL,
 		            TCL_TRACE_READS|TCL_TRACE_WRITES,
 			    ItclTraceItclHullVar,
-		            (ClientData)ioPtr);
+		            ioPtr);
 		    } else {
 	              if (ivPtr->init != NULL) {
-			if (Tcl_SetVar(interp,
-			        Tcl_GetString(ivPtr->namePtr),
+			if (Tcl_SetVar2(interp,
+			        Tcl_GetString(ivPtr->namePtr), NULL,
 			        Tcl_GetString(ivPtr->init),
 				TCL_NAMESPACE_ONLY) == NULL) {
 			    goto errorCleanup;
@@ -955,21 +944,20 @@ ItclInitObjectVariables(
 	              }
 	              if (ivPtr->arrayInitPtr != NULL) {
 			Tcl_DString buffer3;
-	                int i;
-	                int argc;
+	                Tcl_Size i;
+	                Tcl_Size argc;
 	                const char **argv;
 	                const char *val;
-			int result;
 
 			Tcl_DStringInit(&buffer3);
                         Tcl_DStringAppend(&buffer3, varNsPtr->fullName, -1);
                         Tcl_DStringAppend(&buffer3, "::", -1);
                         Tcl_DStringAppend(&buffer3,
 			        Tcl_GetString(ivPtr->namePtr), -1);
-	                result = Tcl_SplitList(interp,
+	                Tcl_SplitList(interp,
 			        Tcl_GetString(ivPtr->arrayInitPtr),
 	                        &argc, &argv);
-	                for (i = 0; i < argc; i++) {
+	                for (i = 0; i < argc; i += 2) {
                             val = Tcl_SetVar2(interp,
 			            Tcl_DStringValue(&buffer3), argv[i],
                                     argv[i + 1], TCL_NAMESPACE_ONLY);
@@ -977,10 +965,9 @@ ItclInitObjectVariables(
                                 Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
                                     "cannot initialize variable \"",
                                     Tcl_GetString(ivPtr->namePtr), "\"",
-                                    (char*)NULL);
+                                    NULL);
                                 return TCL_ERROR;
                             }
-	                    i++;
                         }
 			Tcl_DStringFree(&buffer3);
 		        ckfree((char *)argv);
@@ -992,33 +979,27 @@ ItclInitObjectVariables(
 	                Tcl_TraceVar2(interp, varName, NULL,
 		            TCL_TRACE_READS|TCL_TRACE_WRITES,
 			    ItclTraceItclHullVar,
-		            (ClientData)ioPtr);
+		            ioPtr);
 		    }
 	            hPtr2 = Tcl_FindHashEntry(&iclsPtr2->classCommons,
 		            (char *)ivPtr);
 		    if (hPtr2 == NULL) {
 		        goto errorCleanup;
 		    }
-		    varPtr = Tcl_GetHashValue(hPtr2);
+		    varPtr = (Tcl_Var)Tcl_GetHashValue(hPtr2);
 	            hPtr2 = Tcl_CreateHashEntry(&ioPtr->objectVariables,
 		            (char *)ivPtr, &isNew);
 	            if (isNew) {
+			Itcl_PreserveVar(varPtr);
 		        Tcl_SetHashValue(hPtr2, varPtr);
-		    } else {
-#ifdef NEW_PROTO_RESOLVER
-		    varPtr = Itcl_RegisterObjectVariable(interp, ioPtr,
-		            Tcl_GetString(ivPtr->namePtr),
-			    vlookup->classVarInfoPtr,
-			    varPtr, varNsPtr);
-#endif
 	        }
 	        if (ivPtr->flags & ITCL_COMPONENT_VAR) {
 	            if (ivPtr->flags & ITCL_COMMON) {
                         Tcl_Obj *objPtr2;
 		        objPtr2 = Tcl_NewStringObj(ITCL_VARIABLES_NAMESPACE,
 			        -1);
-                        Tcl_AppendToObj(objPtr2,
-		                Tcl_GetString(ivPtr->iclsPtr->fullNamePtr), -1);
+			Tcl_AppendToObj(objPtr2, (Tcl_GetObjectNamespace(
+				ivPtr->iclsPtr->oPtr))->fullName, -1);
                         Tcl_AppendToObj(objPtr2, "::", -1);
                         Tcl_AppendToObj(objPtr2, varName, -1);
 			/* itcl_hull is traced in itclParse.c */
@@ -1026,19 +1007,19 @@ ItclInitObjectVariables(
                             Tcl_TraceVar2(interp,
                                     Tcl_GetString(objPtr2), NULL,
 	                            TCL_TRACE_WRITES, ItclTraceItclHullVar,
-	                            (ClientData)ioPtr);
+	                            ioPtr);
 			} else {
                             Tcl_TraceVar2(interp,
                                     Tcl_GetString(objPtr2), NULL,
 	                            TCL_TRACE_WRITES, ItclTraceComponentVar,
-	                            (ClientData)ioPtr);
+	                            ioPtr);
 		        }
 		        Tcl_DecrRefCount(objPtr2);
 		    } else {
                         Tcl_TraceVar2(interp,
 		                varName, NULL,
 	                        TCL_TRACE_WRITES, ItclTraceComponentVar,
-	                        (ClientData)ioPtr);
+	                        ioPtr);
 	            }
 	        }
 	    }
@@ -1079,8 +1060,7 @@ int
 ItclInitObjectOptions(
    Tcl_Interp *interp,
    ItclObject *ioPtr,
-   ItclClass *iclsPtr,
-   const char *name)
+   ItclClass *iclsPtr)
 {
     Tcl_DString buffer;
     Tcl_HashEntry *hPtr;
@@ -1092,7 +1072,6 @@ ItclInitObjectOptions(
     ItclHierIter hier;
     ItclOption *ioptPtr;
     ItclDelegatedOption *idoPtr;
-    const char *itclOptionsName;
     int isNew;
 
     ioptPtr = NULL;
@@ -1107,13 +1086,10 @@ ItclInitObjectOptions(
 	            (char *)ioptPtr->namePtr, &isNew);
 	    if (isNew) {
 		Tcl_SetHashValue(hPtr2, ioptPtr);
-                itclOptionsName = Tcl_GetString(ioptPtr->namePtr);
                 Tcl_DStringInit(&buffer);
 	        Tcl_DStringAppend(&buffer, ITCL_VARIABLES_NAMESPACE, -1);
-	        if ((name[0] != ':') && (name[1] != ':')) {
-                     Tcl_DStringAppend(&buffer, "::", 2);
-	        }
-	        Tcl_DStringAppend(&buffer, name, -1);
+		Tcl_DStringAppend(&buffer,
+			(Tcl_GetObjectNamespace(ioPtr->oPtr)->fullName), -1);
 	        varNsPtr = Tcl_FindNamespace(interp,
 		        Tcl_DStringValue(&buffer), NULL, 0);
 	        if (varNsPtr == NULL) {
@@ -1138,7 +1114,7 @@ ItclInitObjectOptions(
                     Tcl_TraceVar2(interp, "itcl_options",
                             NULL,
                             TCL_TRACE_READS|TCL_TRACE_WRITES,
-                            ItclTraceOptionVar, (ClientData)ioPtr);
+                            ItclTraceOptionVar, ioPtr);
 		}
 	        Itcl_PopCallFrame(interp);
             }
@@ -1163,88 +1139,6 @@ ItclInitObjectOptions(
 
 /*
  * ------------------------------------------------------------------------
- *  ItclInitObjectComponents()
- *
- *  Initialize all instance components with the empty string
- *  This is usually invoked automatically by Itcl_CreateObject(),
- *  when an object is created.
- * ------------------------------------------------------------------------
- */
-#if 0
-static int
-ItclInitObjectComponents(
-   Tcl_Interp *interp,
-   ItclObject *ioPtr,
-   ItclClass *iclsPtr,
-   const char *name)
-{
-    Tcl_DString buffer;
-    ItclClass *iclsPtr2;
-    ItclHierIter hier;
-    ItclComponent *icPtr;
-    Tcl_HashEntry *hPtr;
-    Tcl_HashEntry *hPtr2;
-    Tcl_HashSearch place;
-    Tcl_CallFrame frame;
-    Tcl_Namespace *varNsPtr;
-    const char *componentName;
-    int isNew;
-
-    icPtr = NULL;
-    Itcl_InitHierIter(&hier, iclsPtr);
-    iclsPtr2 = Itcl_AdvanceHierIter(&hier);
-    while (iclsPtr2 != NULL) {
-	/* now initialize the options which have an init value */
-        hPtr = Tcl_FirstHashEntry(&iclsPtr2->components, &place);
-        while (hPtr) {
-            icPtr = (ItclComponent *)Tcl_GetHashValue(hPtr);
-	    hPtr2 = Tcl_CreateHashEntry(&ioPtr->objectComponents,
-	            (char *)icPtr->namePtr, &isNew);
-	    if (isNew) {
-		Tcl_SetHashValue(hPtr2, icPtr);
-                componentName = Tcl_GetString(icPtr->namePtr);
-                Tcl_DStringInit(&buffer);
-	        Tcl_DStringAppend(&buffer, ITCL_VARIABLES_NAMESPACE, -1);
-	        if ((name[0] != ':') && (name[1] != ':')) {
-                     Tcl_DStringAppend(&buffer, "::", 2);
-	        }
-	        Tcl_DStringAppend(&buffer, name, -1);
-	        varNsPtr = Tcl_FindNamespace(interp,
-		        Tcl_DStringValue(&buffer), NULL, 0);
-	        if (varNsPtr == NULL) {
-	            varNsPtr = Tcl_CreateNamespace(interp,
-		            Tcl_DStringValue(&buffer), NULL, 0);
-	        }
-                Tcl_DStringFree(&buffer);
-	        /* now initialize the options which have an init value */
-                if (Itcl_PushCallFrame(interp, &frame, varNsPtr,
-                        /*isProcCallFrame*/0) != TCL_OK) {
-                    return TCL_ERROR;
-                }
-                if (Tcl_SetVar2(interp, Tcl_GetString(icPtr->namePtr),
-		        NULL,
-	                "",
-			TCL_NAMESPACE_ONLY) == NULL) {
-	            Itcl_PopCallFrame(interp);
-		    return TCL_ERROR;
-                }
-                Tcl_TraceVar2(interp, Tcl_GetString(icPtr->namePtr),
-                        NULL,
-                        TCL_TRACE_READS|TCL_TRACE_WRITES,
-                        ItclTraceComponentVar, (ClientData)ioPtr);
-	        Itcl_PopCallFrame(interp);
-            }
-            hPtr = Tcl_NextHashEntry(&place);
-        }
-        iclsPtr2 = Itcl_AdvanceHierIter(&hier);
-    }
-    Itcl_DeleteHierIter(&hier);
-    return TCL_OK;
-}
-#endif
-
-/*
- * ------------------------------------------------------------------------
  *  ItclInitObjectMethodVariables()
  *
  *  Collect all instance methdovariables for the given object instance to allow
@@ -1255,10 +1149,10 @@ ItclInitObjectComponents(
  */
 int
 ItclInitObjectMethodVariables(
-   Tcl_Interp *interp,
+   TCL_UNUSED(Tcl_Interp *),
    ItclObject *ioPtr,
    ItclClass *iclsPtr,
-   const char *name)
+   TCL_UNUSED(const char *))
 {
     ItclClass *iclsPtr2;
     ItclHierIter hier;
@@ -1308,16 +1202,17 @@ Itcl_DeleteObject(
     Tcl_CmdInfo cmdInfo;
     Tcl_HashEntry *hPtr;
 
+
     Tcl_GetCommandInfoFromToken(contextIoPtr->accessCmd, &cmdInfo);
 
     contextIoPtr->flags |= ITCL_OBJECT_IS_DELETED;
-    Itcl_PreserveData((ClientData)contextIoPtr);
+    Itcl_PreserveData(contextIoPtr);
 
     /*
      *  Invoke the object's destructors.
      */
     if (Itcl_DestructObject(interp, contextIoPtr, 0) != TCL_OK) {
-        Itcl_ReleaseData((ClientData)contextIoPtr);
+	Itcl_ReleaseData(contextIoPtr);
 	contextIoPtr->flags |=
 	        ITCL_TCLOO_OBJECT_IS_DELETED|ITCL_OBJECT_DESTRUCT_ERROR;
         return TCL_ERROR;
@@ -1341,7 +1236,7 @@ Itcl_DeleteObject(
     if ((contextIoPtr->accessCmd != NULL) && (!(contextIoPtr->flags &
             (ITCL_OBJECT_IS_RENAMED)))) {
     if (Tcl_GetCommandInfoFromToken(contextIoPtr->accessCmd, &cmdInfo) == 1) {
-        cmdInfo.deleteProc = Itcl_ReleaseData;
+        cmdInfo.deleteProc = (Tcl_CmdDeleteProc *)Itcl_ReleaseData;
 	Tcl_SetCommandInfoFromToken(contextIoPtr->accessCmd, &cmdInfo);
 
         Tcl_DeleteCommandFromToken(interp, contextIoPtr->accessCmd);
@@ -1350,7 +1245,7 @@ Itcl_DeleteObject(
     contextIoPtr->oPtr = NULL;
     contextIoPtr->accessCmd = NULL;
 
-    Itcl_ReleaseData((ClientData)contextIoPtr);  /* object should die here */
+    Itcl_ReleaseData(contextIoPtr);
 
     return TCL_OK;
 }
@@ -1383,13 +1278,13 @@ ItclDeleteObjectVariablesNamespace(
 
 static int
 FinalizeDeleteObject(
-    ClientData data[],
+    void *data[],
     Tcl_Interp *interp,
     int result)
 {
-    ItclObject *contextIoPtr = data[0];
-    ItclDeleteObjectVariablesNamespace(interp, contextIoPtr);
+    ItclObject *contextIoPtr = (ItclObject *)data[0];
     if (result == TCL_OK) {
+	ItclDeleteObjectVariablesNamespace(interp, contextIoPtr);
         Tcl_ResetResult(interp);
     }
 
@@ -1401,12 +1296,12 @@ FinalizeDeleteObject(
 
 static int
 CallDestructBase(
-    ClientData data[],
+    void *data[],
     Tcl_Interp *interp,
     int result)
 {
     Tcl_Obj *objPtr;
-    ItclObject *contextIoPtr = data[0];
+    ItclObject *contextIoPtr = (ItclObject *)data[0];
     int flags = PTR2INT(data[1]);
 
     if (result != TCL_OK) {
@@ -1461,7 +1356,7 @@ Itcl_DestructObject(
         if ((flags & ITCL_IGNORE_ERRS) == 0) {
             Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
                 "can't delete an object while it is being destructed",
-                (char*)NULL);
+                NULL);
             return TCL_ERROR;
         }
         return TCL_OK;
@@ -1529,7 +1424,7 @@ ItclDestructBase(
     if (Tcl_FindHashEntry(contextIoPtr->destructed,
             (char *)contextIclsPtr->namePtr) == NULL) {
         result = Itcl_InvokeMethodIfExists(interp, "destructor",
-            contextIclsPtr, contextIoPtr, 0, (Tcl_Obj* const*)NULL);
+            contextIclsPtr, contextIoPtr, 0, NULL);
         if (result != TCL_OK) {
             return TCL_ERROR;
         }
@@ -1603,7 +1498,7 @@ Itcl_FindObject(
         if (Tcl_GetCommandInfoFromToken(cmd, &cmdInfo) != 1) {
             *roPtr = NULL;
         }
-        *roPtr = cmdInfo.deleteData;
+        *roPtr = (ItclObject *)cmdInfo.deleteData;
     } else {
         *roPtr = NULL;
     }
@@ -1719,7 +1614,7 @@ ItclGetInstanceVar(
         Tcl_ResetResult(interp);
         Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
             "cannot access object-specific info without an object context",
-            (char*)NULL);
+            NULL);
         return NULL;
     }
 
@@ -1730,18 +1625,34 @@ ItclGetInstanceVar(
         iclsPtr = contextIclsPtr;
     }
     ivPtr = NULL;
-    hPtr = Tcl_FindHashEntry(&iclsPtr->resolveVars, (char *)name1);
+    hPtr = ItclResolveVarEntry(iclsPtr, (char *)name1);
     if (hPtr != NULL) {
-        vlookup = Tcl_GetHashValue(hPtr);
+        vlookup = (ItclVarLookup *)Tcl_GetHashValue(hPtr);
         ivPtr = vlookup->ivPtr;
-    } else {
-    }
     /*
      *  Install the object context and access the data member
      *  like any other variable.
      */
+    hPtr = Tcl_FindHashEntry(&contextIoPtr->objectVariables, (char *)ivPtr);
+    if (hPtr) {
+	Tcl_Obj *varName = Tcl_NewObj();
+	Tcl_Var varPtr = (Tcl_Var)Tcl_GetHashValue(hPtr);
+	Tcl_GetVariableFullName(interp, varPtr, varName);
+
+	val = Tcl_GetVar2(interp, Tcl_GetString(varName), name2,
+		TCL_LEAVE_ERR_MSG | TCL_GLOBAL_ONLY);
+	Tcl_DecrRefCount(varName);
+	if (val) {
+	    return val;
+	}
+    }
+    }
+
     isItclOptions = 0;
     if (strcmp(name1, "itcl_options") == 0) {
+        isItclOptions = 1;
+    }
+    if (strcmp(name1, "itcl_option_components") == 0) {
         isItclOptions = 1;
     }
     Tcl_DStringInit(&buffer);
@@ -1763,8 +1674,8 @@ ItclGetInstanceVar(
         }
     }
     if (doAppend) {
-        Tcl_DStringAppend(&buffer,
-                Tcl_GetString(contextIclsPtr->fullNamePtr), -1);
+        Tcl_DStringAppend(&buffer, (Tcl_GetObjectNamespace(
+		contextIclsPtr->oPtr))->fullName, -1);
     }
     nsPtr = Tcl_FindNamespace(interp, Tcl_DStringValue(&buffer), NULL, 0);
     Tcl_DStringFree(&buffer);
@@ -1816,7 +1727,7 @@ ItclGetCommonInstanceVar(
         Tcl_ResetResult(interp);
         Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
             "cannot access object-specific info without an object context",
-            (char*)NULL);
+            NULL);
         return NULL;
     }
 
@@ -1832,10 +1743,13 @@ ItclGetCommonInstanceVar(
         if (strcmp(name1, "itcl_options") == 0) {
 	    doAppend = 0;
         }
+        if (strcmp(name1, "itcl_option_components") == 0) {
+	    doAppend = 0;
+        }
     }
     if (doAppend) {
-        Tcl_DStringAppend(&buffer,
-                Tcl_GetString(contextIclsPtr->fullNamePtr), -1);
+        Tcl_DStringAppend(&buffer, (Tcl_GetObjectNamespace(
+		contextIclsPtr->oPtr))->fullName, -1);
     }
     nsPtr = Tcl_FindNamespace(interp, Tcl_DStringValue(&buffer), NULL, 0);
     Tcl_DStringFree(&buffer);
@@ -1918,7 +1832,7 @@ ItclSetInstanceVar(
         Tcl_ResetResult(interp);
         Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
             "cannot access object-specific info without an object context",
-            (char*)NULL);
+            NULL);
         return NULL;
     }
     /* get the variable definition to check if that is an ITCL_COMMON */
@@ -1927,9 +1841,9 @@ ItclSetInstanceVar(
     } else {
         iclsPtr = contextIclsPtr;
     }
-    hPtr = Tcl_FindHashEntry(&iclsPtr->resolveVars, (char *)name1);
+    hPtr = ItclResolveVarEntry(iclsPtr, (char *)name1);
     if (hPtr != NULL) {
-        vlookup = Tcl_GetHashValue(hPtr);
+        vlookup = (ItclVarLookup *)Tcl_GetHashValue(hPtr);
         ivPtr = vlookup->ivPtr;
     } else {
         return NULL;
@@ -1938,8 +1852,24 @@ ItclSetInstanceVar(
      *  Install the object context and access the data member
      *  like any other variable.
      */
+
+    hPtr = Tcl_FindHashEntry(&contextIoPtr->objectVariables, (char *)ivPtr);
+    if (hPtr) {
+	Tcl_Obj *varName = Tcl_NewObj();
+	Tcl_Var varPtr = (Tcl_Var)Tcl_GetHashValue(hPtr);
+	Tcl_GetVariableFullName(interp, varPtr, varName);
+
+	val = Tcl_SetVar2(interp, Tcl_GetString(varName), name2, value,
+		TCL_LEAVE_ERR_MSG);
+	Tcl_DecrRefCount(varName);
+	return val;
+    }
+
     isItclOptions = 0;
     if (strcmp(name1, "itcl_options") == 0) {
+        isItclOptions = 1;
+    }
+    if (strcmp(name1, "itcl_option_components") == 0) {
         isItclOptions = 1;
     }
     Tcl_DStringInit(&buffer);
@@ -1962,8 +1892,8 @@ ItclSetInstanceVar(
         }
     }
     if (doAppend) {
-        Tcl_DStringAppend(&buffer,
-                Tcl_GetString(contextIclsPtr->fullNamePtr), -1);
+        Tcl_DStringAppend(&buffer, (Tcl_GetObjectNamespace(
+		contextIclsPtr->oPtr))->fullName, -1);
     }
     nsPtr = Tcl_FindNamespace(interp, Tcl_DStringValue(&buffer), NULL, 0);
     Tcl_DStringFree(&buffer);
@@ -1992,24 +1922,49 @@ void
 ItclReportObjectUsage(
     Tcl_Interp *interp,           /* current interpreter */
     ItclObject *contextIoPtr,     /* current object */
-    Tcl_Namespace *callerNsPtr,
+    TCL_UNUSED(Tcl_Namespace *),
     Tcl_Namespace *contextNsPtr)  /* the context namespace */
 {
     Tcl_Obj *namePtr;
     Tcl_HashEntry *entry;
     Tcl_HashSearch place;
     Tcl_Obj *resultPtr;
-    ItclClass *iclsPtr;
+    ItclClass *iclsPtr = NULL;
     Itcl_List cmdList;
     Itcl_ListElem *elem;
     ItclMemberFunc *imPtr;
     ItclMemberFunc *cmpFunc;
     ItclCmdLookup *clookup;
+    ItclObjectInfo * infoPtr = NULL;
     char *name;
     int ignore;
     int cmp;
 
-    iclsPtr = (ItclClass*)contextIoPtr->iclsPtr;
+    if (contextIoPtr == NULL) {
+        resultPtr = Tcl_GetObjResult(interp);
+        infoPtr = (ItclObjectInfo *)Tcl_GetAssocData(interp, ITCL_INTERP_DATA, NULL);
+        if (infoPtr == NULL) {
+            Tcl_AppendResult(interp, " PANIC cannot get Itcl AssocData in ItclReportObjectUsage", NULL);
+	    return;
+        }
+	if (contextNsPtr == NULL) {
+            Tcl_AppendResult(interp, " PANIC cannot get contextNsPtr in ItclReportObjectUsage", NULL);
+	    return;
+	}
+
+	entry = Tcl_FindHashEntry(&infoPtr->namespaceClasses,
+		(char *)contextNsPtr);
+	if (entry) {
+	    iclsPtr = (ItclClass *)Tcl_GetHashValue(entry);
+	}
+
+        if (iclsPtr == NULL) {
+          Tcl_AppendResult(interp, " PANIC cannot get class from contextNsPtr ItclReportObjectUsage", NULL);
+          return;
+        }
+    } else {
+        iclsPtr = (ItclClass*)contextIoPtr->iclsPtr;
+    }
     ignore = ITCL_CONSTRUCTOR | ITCL_DESTRUCTOR | ITCL_COMMON;
     /*
      *  Scan through all methods in the virtual table and sort
@@ -2041,9 +1996,6 @@ ItclReportObjectUsage(
 	        if (imPtr->codePtr != NULL) {
 	            body = Tcl_GetString(imPtr->codePtr->bodyPtr);
 	            if (*body == '@') {
-                        if (strcmp(body, "@itcl-builtin-info") == 0) {
-	                    imPtr = NULL;
-		        }
                         if (strcmp(body, "@itcl-builtin-setget") == 0) {
 			    if (!(imPtr->iclsPtr->flags & ITCL_ECLASS)) {
 	                        imPtr = NULL;
@@ -2068,7 +2020,7 @@ ItclReportObjectUsage(
                 cmp = strcmp(Tcl_GetString(imPtr->namePtr),
 		        Tcl_GetString(cmpFunc->namePtr));
                 if (cmp < 0) {
-                    Itcl_InsertListElem(elem, (ClientData)imPtr);
+                    Itcl_InsertListElem(elem, imPtr);
                     imPtr = NULL;
                     break;
                 } else {
@@ -2080,7 +2032,7 @@ ItclReportObjectUsage(
                 elem = Itcl_NextListElem(elem);
             }
             if (imPtr) {
-                Itcl_AppendList(&cmdList, (ClientData)imPtr);
+                Itcl_AppendList(&cmdList, imPtr);
             }
         }
         entry = Tcl_NextHashEntry(&place);
@@ -2116,81 +2068,34 @@ ItclReportObjectUsage(
  *  the "this" variable cannot be set.
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 static char*
 ItclTraceThisVar(
-    ClientData cdata,	    /* object instance data */
-    Tcl_Interp *interp,	    /* interpreter managing this variable */
+    void *cdata,	      /* object instance data */
+    Tcl_Interp *interp,	  /* interpreter managing this variable */
     const char *name1,    /* variable name */
-    const char *name2,    /* unused */
-    int flags)		    /* flags indicating read/write */
+    TCL_UNUSED(const char *),/* unused */
+    int flags)		      /* flags indicating read/write */
 {
     ItclObject *contextIoPtr = (ItclObject*)cdata;
-    const char *objName;
     Tcl_Obj *objPtr;
-    int isDone;
+    const char *objName;
+
+    /* because of SF bug #187 use a different trace handler for "this", "win", "type"
+     * *self" and "selfns"
+     */
 
     /*
      *  Handle read traces on "this"
      */
     if ((flags & TCL_TRACE_READS) != 0) {
         objPtr = Tcl_NewStringObj("", -1);
-	if (strcmp(name1, "this") == 0) {
-            if (contextIoPtr->accessCmd) {
-                Tcl_GetCommandFullName(contextIoPtr->iclsPtr->interp,
-                    contextIoPtr->accessCmd, objPtr);
-            }
-
-	} else {
-	    isDone = 0;
-	    if (strcmp(name1, "type") == 0) {
-		Tcl_SetStringObj(objPtr,
-		        Tcl_GetCurrentNamespace(
-			contextIoPtr->iclsPtr->interp)->fullName, -1);
-	        isDone = 1;
-	    }
-	    if (!isDone && (strcmp(name1, "self") == 0)) {
-		if (contextIoPtr->iclsPtr->flags &
-		        (ITCL_WIDGET|ITCL_WIDGETADAPTOR)) {
-		    const char *objectName;
-
-		    objectName = ItclGetInstanceVar(
-			    contextIoPtr->iclsPtr->interp,
-			    "itcl_hull", NULL, contextIoPtr,
-			    contextIoPtr->iclsPtr);
-		    if (strlen(objectName) == 0) {
-			objPtr = contextIoPtr->namePtr;
-			Tcl_IncrRefCount(objPtr);
-		    } else {
-		        Tcl_SetStringObj(objPtr, objectName, -1);
-		    }
-		} else {
-                    Tcl_GetCommandFullName(contextIoPtr->iclsPtr->interp,
-                            contextIoPtr->accessCmd, objPtr);
-		}
-	        isDone = 1;
-	    }
-	    if (!isDone && (strcmp(name1, "selfns") == 0)) {
-		Tcl_SetStringObj(objPtr,
-		        Tcl_GetString(contextIoPtr->varNsNamePtr), -1);
-		Tcl_AppendToObj(objPtr,
-		        Tcl_GetString(contextIoPtr->iclsPtr->fullNamePtr), -1);
-	        isDone = 1;
-            }
-	    if (!isDone && (strcmp(name1, "win") == 0)) {
-		Tcl_SetStringObj(objPtr,
-                        Tcl_GetString(contextIoPtr->origNamePtr)+2, -1);
-	        isDone = 1;
-	    }
-	    if (!isDone && (contextIoPtr->iclsPtr->flags & ITCL_WIDGET)) {
-	        /* thiswidget variable */
-	        Tcl_SetStringObj(objPtr, Tcl_GetCommandName(
-		        contextIoPtr->iclsPtr->interp,
-			contextIoPtr->accessCmd), -1);
-	    }
-	}
+        if (contextIoPtr->accessCmd) {
+            Tcl_GetCommandFullName(contextIoPtr->iclsPtr->interp,
+                contextIoPtr->accessCmd, objPtr);
+        }
         objName = Tcl_GetString(objPtr);
-        Tcl_SetVar(interp, (const char *)name1, objName, 0);
+        Tcl_SetVar2(interp, name1, NULL, objName, 0);
 
         Tcl_DecrRefCount(objPtr);
         return NULL;
@@ -2200,23 +2105,237 @@ ItclTraceThisVar(
      *  Handle write traces on "this"
      */
     if ((flags & TCL_TRACE_WRITES) != 0) {
-	if (strcmp(name1, "this") == 0) {
-            return "variable \"this\" cannot be modified";
+        return (char *)"variable \"this\" cannot be modified";
+    }
+    return NULL;
+}
+
+/*
+ * ------------------------------------------------------------------------
+ *  ItclTraceWinVar()
+ *
+ *  Invoked to handle read/write traces on the "win" variable built
+ *  into each object.
+ *
+ *  On read, this procedure updates the "win" variable to contain the
+ *  current object name.  This is done dynamically, since an object's
+ *  identity can change if its access command is renamed.
+ *
+ *  On write, this procedure returns an error string, warning that
+ *  the "win" variable cannot be set.
+ * ------------------------------------------------------------------------
+ */
+
+static char*
+ItclTraceWinVar(
+    void *cdata,          /* object instance data */
+    Tcl_Interp *interp,	  /* interpreter managing this variable */
+    const char *name1,    /* variable name */
+    TCL_UNUSED(const char *),/* unused */
+    int flags)            /* flags indicating read/write */
+{
+    ItclObject *contextIoPtr = (ItclObject*)cdata;
+    Tcl_DString buffer;
+    Tcl_Obj *objPtr;
+    const char *objName;
+    const char *head;
+    const char *tail;
+
+    /*
+     *  Handle read traces on "win"
+     */
+    if ((flags & TCL_TRACE_READS) != 0) {
+        objPtr = Tcl_NewStringObj("", -1);
+        /* a window path name must not contain namespace parts !! */
+        Itcl_ParseNamespPath(Tcl_GetString(contextIoPtr->origNamePtr), &buffer, &head, &tail);
+	if (tail == NULL) {
+	    return (char *)" INTERNAL ERROR tail == NULL in ItclTraceThisVar for win";
 	}
-	if (strcmp(name1, "win") == 0) {
-	    if (!(contextIoPtr->iclsPtr->flags & ITCL_ECLASS)) {
-                return "variable \"win\" cannot be modified";
-	    }
-	}
-	if (strcmp(name1, "type") == 0) {
-            return "variable \"type\" cannot be modified";
-	}
-	if (strcmp(name1, "self") == 0) {
-            return "variable \"self\" cannot be modified";
-	}
-	if (strcmp(name1, "selfns") == 0) {
-            return "variable \"selfns\" cannot be modified";
-	}
+        Tcl_SetStringObj(objPtr, tail, -1);
+        objName = Tcl_GetString(objPtr);
+        Tcl_SetVar2(interp, name1, NULL, objName, 0);
+
+        Tcl_DecrRefCount(objPtr);
+        return NULL;
+    }
+
+    /*
+     *  Handle write traces on "win"
+     */
+    if ((flags & TCL_TRACE_WRITES) != 0) {
+        if (!(contextIoPtr->iclsPtr->flags & ITCL_ECLASS)) {
+            return (char *)"variable \"win\" cannot be modified";
+        }
+    }
+    return NULL;
+}
+
+/*
+ * ------------------------------------------------------------------------
+ *  ItclTraceTypeVar()
+ *
+ *  Invoked to handle read/write traces on the "type" variable built
+ *  into each object.
+ *
+ *  On read, this procedure updates the "type" variable to contain the
+ *  current object name.  This is done dynamically, since an object's
+ *  identity can change if its access command is renamed.
+ *
+ *  On write, this procedure returns an error string, warning that
+ *  the "type" variable cannot be set.
+ * ------------------------------------------------------------------------
+ */
+
+static char*
+ItclTraceTypeVar(
+    void *cdata,          /* object instance data */
+    Tcl_Interp *interp,	  /* interpreter managing this variable */
+    const char *name1,    /* variable name */
+    TCL_UNUSED(const char *),/* unused */
+    int flags)            /* flags indicating read/write */
+{
+    ItclObject *contextIoPtr = (ItclObject*)cdata;
+    Tcl_Obj *objPtr;
+    const char *objName;
+
+    /*
+     *  Handle read traces on "type"
+     */
+    if ((flags & TCL_TRACE_READS) != 0) {
+        objPtr = Tcl_NewStringObj("", -1);
+        Tcl_SetStringObj(objPtr,
+        Tcl_GetCurrentNamespace(contextIoPtr->iclsPtr->interp)->fullName, -1);
+        objName = Tcl_GetString(objPtr);
+        Tcl_SetVar2(interp, name1, NULL, objName, 0);
+
+        Tcl_DecrRefCount(objPtr);
+        return NULL;
+    }
+
+    /*
+     *  Handle write traces on "type"
+     */
+    if ((flags & TCL_TRACE_WRITES) != 0) {
+        return (char *)"variable \"type\" cannot be modified";
+    }
+    return NULL;
+}
+
+/*
+ * ------------------------------------------------------------------------
+ *  ItclTraceSelfVar()
+ *
+ *  Invoked to handle read/write traces on the "self" variable built
+ *  into each object.
+ *
+ *  On read, this procedure updates the "self" variable to contain the
+ *  current object name.  This is done dynamically, since an object's
+ *  identity can change if its access command is renamed.
+ *
+ *  On write, this procedure returns an error string, warning that
+ *  the "self" variable cannot be set.
+ * ------------------------------------------------------------------------
+ */
+
+static char*
+ItclTraceSelfVar(
+    void *cdata,          /* object instance data */
+    Tcl_Interp *interp,	  /* interpreter managing this variable */
+    const char *name1,    /* variable name */
+    TCL_UNUSED(const char *),/* unused */
+    int flags)            /* flags indicating read/write */
+{
+    ItclObject *contextIoPtr = (ItclObject*)cdata;
+    Tcl_Obj *objPtr;
+    const char *objName;
+
+    /*
+     *  Handle read traces on "self"
+     */
+    if ((flags & TCL_TRACE_READS) != 0) {
+        objPtr = Tcl_NewStringObj("", -1);
+        if (contextIoPtr->iclsPtr->flags &
+                (ITCL_WIDGET|ITCL_WIDGETADAPTOR)) {
+            const char *objectName;
+
+            objectName = ItclGetInstanceVar(
+                    contextIoPtr->iclsPtr->interp,
+                    "itcl_hull", NULL, contextIoPtr,
+                    contextIoPtr->iclsPtr);
+            if (strlen(objectName) == 0) {
+	        objPtr = contextIoPtr->namePtr;
+	        Tcl_IncrRefCount(objPtr);
+            } else {
+                Tcl_SetStringObj(objPtr, objectName, -1);
+            }
+        } else {
+            Tcl_GetCommandFullName(contextIoPtr->iclsPtr->interp,
+                    contextIoPtr->accessCmd, objPtr);
+        }
+        objName = Tcl_GetString(objPtr);
+        Tcl_SetVar2(interp, name1, NULL, objName, 0);
+
+        Tcl_DecrRefCount(objPtr);
+        return NULL;
+    }
+
+    /*
+     *  Handle write traces on "self"
+     */
+    if ((flags & TCL_TRACE_WRITES) != 0) {
+        return (char *)"variable \"self\" cannot be modified";
+    }
+    return NULL;
+}
+
+/*
+ * ------------------------------------------------------------------------
+ *  ItclTraceSelfnsVar()
+ *
+ *  Invoked to handle read/write traces on the "selfns" variable built
+ *  into each object.
+ *
+ *  On read, this procedure updates the "selfns" variable to contain the
+ *  current object name.  This is done dynamically, since an object's
+ *  identity can change if its access command is renamed.
+ *
+ *  On write, this procedure returns an error string, warning that
+ *  the "selfns" variable cannot be set.
+ * ------------------------------------------------------------------------
+ */
+
+static char*
+ItclTraceSelfnsVar(
+    void *cdata,          /* object instance data */
+    Tcl_Interp *interp,	  /* interpreter managing this variable */
+    const char *name1,    /* variable name */
+    TCL_UNUSED(const char *),/* unused */
+    int flags)	          /* flags indicating read/write */
+{
+    ItclObject *contextIoPtr = (ItclObject*)cdata;
+    Tcl_Obj *objPtr;
+    const char *objName;
+
+    /*
+     *  Handle read traces on "selfns"
+     */
+    if ((flags & TCL_TRACE_READS) != 0) {
+        objPtr = Tcl_NewStringObj("", -1);
+        Tcl_SetStringObj(objPtr, Tcl_GetString(contextIoPtr->varNsNamePtr), -1);
+        Tcl_AppendToObj(objPtr,
+                Tcl_GetString(contextIoPtr->iclsPtr->fullNamePtr), -1);
+        objName = Tcl_GetString(objPtr);
+        Tcl_SetVar2(interp, name1, NULL, objName, 0);
+
+        Tcl_DecrRefCount(objPtr);
+        return NULL;
+    }
+
+    /*
+     *  Handle write traces on "selfns"
+     */
+    if ((flags & TCL_TRACE_WRITES) != 0) {
+        return (char *)"variable \"selfns\" cannot be modified";
     }
     return NULL;
 }
@@ -2232,14 +2351,14 @@ ItclTraceThisVar(
  *  or validateMethodPtr and calls it
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 static char*
 ItclTraceOptionVar(
-    ClientData cdata,	    /* object instance data */
-    Tcl_Interp *interp,	    /* interpreter managing this variable */
-    const char *name1,      /* variable name */
-    const char *name2,      /* unused */
-    int flags)		    /* flags indicating read/write */
+    void *cdata,            /* object instance data */
+    TCL_UNUSED(Tcl_Interp *),/* interpreter managing this variable */
+    TCL_UNUSED(const char *),/* variable name */
+    TCL_UNUSED(const char *),/* unused */
+    int flags)              /* flags indicating read/write */
 {
     ItclObject *ioPtr;
     ItclOption *ioptPtr;
@@ -2249,15 +2368,19 @@ ItclTraceOptionVar(
 /* FIXME should free memory on unset or rename!! */
     if (cdata != NULL) {
         ioPtr = (ItclObject*)cdata;
+	if (ioPtr == NULL) {
+	}
     } else {
         ioptPtr = (ItclOption*)cdata;
+	if (ioptPtr == NULL) {
+	}
         /*
          *  Handle read traces "itcl_options"
          */
         if ((flags & TCL_TRACE_READS) != 0) {
             return NULL;
         }
-    
+
         /*
          *  Handle write traces "itcl_options"
          */
@@ -2276,14 +2399,14 @@ ItclTraceOptionVar(
  *
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 static char*
 ItclTraceComponentVar(
-    ClientData cdata,	    /* object instance data */
+    void *cdata,            /* object instance data */
     Tcl_Interp *interp,	    /* interpreter managing this variable */
     const char *name1,      /* variable name */
-    const char *name2,      /* unused */
-    int flags)		    /* flags indicating read/write */
+    TCL_UNUSED(const char *),/* unused */
+    int flags)              /* flags indicating read/write */
 {
     FOREACH_HASH_DECLS;
     Tcl_HashEntry *hPtr2;
@@ -2319,13 +2442,13 @@ ItclTraceComponentVar(
 	    }
             /* need to redo the delegation for this component !! */
             if (hPtr == NULL) {
-                return " INTERNAL ERROR cannot get component to write to";
+                return (char *)" INTERNAL ERROR cannot get component to write to";
             }
-            icPtr = Tcl_GetHashValue(hPtr);
+            icPtr = (ItclComponent *)Tcl_GetHashValue(hPtr);
 	    val = ItclGetInstanceVar(interp, name1, NULL, ioPtr,
                     ioPtr->iclsPtr);
 	    if ((val == NULL) || (strlen(val) == 0)) {
-	        return " INTERNAL ERROR cannot get value for component";
+	        return (char *)" INTERNAL ERROR cannot get value for component";
 	    }
 	    componentValuePtr = Tcl_NewStringObj(val, -1);
             Tcl_IncrRefCount(componentValuePtr);
@@ -2353,12 +2476,12 @@ ItclTraceComponentVar(
     } else {
         icPtr = (ItclComponent *)cdata;
         /*
-         *  Handle read traces 
+         *  Handle read traces
          */
         if ((flags & TCL_TRACE_READS) != 0) {
             return NULL;
         }
-    
+
         /*
          *  Handle write traces
          */
@@ -2378,14 +2501,14 @@ ItclTraceComponentVar(
  *  after the first initialization
  * ------------------------------------------------------------------------
  */
-/* ARGSUSED */
+
 static char*
 ItclTraceItclHullVar(
-    ClientData cdata,	    /* object instance data */
+    void *cdata,            /* object instance data */
     Tcl_Interp *interp,	    /* interpreter managing this variable */
     const char *name1,      /* variable name */
-    const char *name2,      /* unused */
-    int flags)		    /* flags indicating read/write */
+    TCL_UNUSED(const char *),/* unused */
+    int flags)              /* flags indicating read/write */
 {
     Tcl_HashEntry *hPtr;
     Tcl_Obj *objPtr;
@@ -2408,9 +2531,9 @@ ItclTraceItclHullVar(
 	hPtr = Tcl_FindHashEntry(&ioPtr->iclsPtr->variables, (char *)objPtr);
         Tcl_DecrRefCount(objPtr);
 	if (hPtr == NULL) {
-	    return "INTERNAL ERROR cannot find itcl_hull variable in class definition!!";
+	    return (char *)"INTERNAL ERROR cannot find itcl_hull variable in class definition!!";
 	}
-	ivPtr = Tcl_GetHashValue(hPtr);
+	ivPtr = (ItclVariable *)Tcl_GetHashValue(hPtr);
         /*
          *  Handle write traces
          */
@@ -2419,19 +2542,19 @@ ItclTraceItclHullVar(
 		ivPtr->initted = 1;
                 return NULL;
 	    } else {
-	        return "The itcl_hull component cannot be redefined";
+	        return (char *)"The itcl_hull component cannot be redefined";
 	    }
         }
 
     } else {
         ivPtr = (ItclVariable *)cdata;
         /*
-         *  Handle read traces 
+         *  Handle read traces
          */
         if ((flags & TCL_TRACE_READS) != 0) {
             return NULL;
         }
-    
+
         /*
          *  Handle write traces
          */
@@ -2459,7 +2582,7 @@ ItclTraceItclHullVar(
  */
 static void
 ItclDestroyObject(
-    ClientData cdata)  /* object instance data */
+    void *cdata)  /* object instance data */
 {
     ItclObject *contextIoPtr = (ItclObject*)cdata;
     Tcl_HashEntry *hPtr;
@@ -2495,27 +2618,27 @@ ItclDestroyObject(
         }
         contextIoPtr->accessCmd = NULL;
     }
-    Itcl_ReleaseData((ClientData)contextIoPtr);
+    Itcl_ReleaseData(contextIoPtr);
 }
 
 /*
  * ------------------------------------------------------------------------
- *  ItclFreeObject()
+ *  FreeObject()
  *
  *  Deletes all instance variables and frees all memory associated with
- *  the given object instance.  This is usually invoked automatically
- *  by Itcl_ReleaseData(), when an object's data is no longer being used.
+ *  the given object instance.  Called when releases match preserves.
  * ------------------------------------------------------------------------
  */
 static void
-ItclFreeObject(
+FreeObject(
     char * cdata)  /* object instance data */
 {
-    Tcl_HashEntry *hPtr;
+    FOREACH_HASH_DECLS;
     Tcl_HashSearch place;
     ItclCallContext *callContextPtr;
     ItclObject *ioPtr;
-    
+    Tcl_Var var;
+
     ioPtr = (ItclObject*)cdata;
 
     /*
@@ -2530,7 +2653,7 @@ ItclFreeObject(
      *    from below.
      */
 
-    Itcl_ReleaseData((ClientData)ioPtr->iclsPtr);
+    ItclReleaseClass(ioPtr->iclsPtr);
     if (ioPtr->constructed) {
         Tcl_DeleteHashTable(ioPtr->constructed);
         ckfree((char*)ioPtr->constructed);
@@ -2544,14 +2667,18 @@ ItclFreeObject(
      *  Delete all context definitions.
      */
     while (1) {
-        hPtr = Tcl_FirstHashEntry(&ioPtr->contextCache, &place);
-        if (hPtr == NULL) {
-            break;
-        }
-        callContextPtr = Tcl_GetHashValue(hPtr);
+	hPtr = Tcl_FirstHashEntry(&ioPtr->contextCache, &place);
+	if (hPtr == NULL) {
+	    break;
+	}
+	callContextPtr = (ItclCallContext *)Tcl_GetHashValue(hPtr);
 	Tcl_DeleteHashEntry(hPtr);
-        ckfree((char *)callContextPtr);
+	ckfree((char *)callContextPtr);
     }
+    FOREACH_HASH_VALUE(var, &ioPtr->objectVariables) {
+	Itcl_ReleaseVar(var);
+    }
+
     Tcl_DeleteHashTable(&ioPtr->contextCache);
     Tcl_DeleteHashTable(&ioPtr->objectVariables);
     Tcl_DeleteHashTable(&ioPtr->objectOptions);
@@ -2559,11 +2686,6 @@ ItclFreeObject(
     Tcl_DeleteHashTable(&ioPtr->objectMethodVariables);
     Tcl_DeleteHashTable(&ioPtr->objectDelegatedOptions);
     Tcl_DeleteHashTable(&ioPtr->objectDelegatedFunctions);
-    hPtr = Tcl_FindHashEntry(&ioPtr->infoPtr->objectNames,
-            (char *)ioPtr->namePtr);
-    if (hPtr != NULL) {
-        Tcl_DeleteHashEntry(hPtr);
-    }
     Tcl_DecrRefCount(ioPtr->namePtr);
     Tcl_DecrRefCount(ioPtr->origNamePtr);
     if (ioPtr->createNamePtr != NULL) {
@@ -2577,7 +2699,7 @@ ItclFreeObject(
 	ckfree((char *)ioPtr->resolvePtr->clientData);
         ckfree((char*)ioPtr->resolvePtr);
     }
-    ckfree((char*)ioPtr);
+    Itcl_Free(ioPtr);
 }
 
 /*
@@ -2589,14 +2711,14 @@ ItclFreeObject(
 
 static int
 CallPublicObjectCmd(
-    ClientData data[],
+    void *data[],
     Tcl_Interp *interp,
     int result)
 {
-    Tcl_Object *oPtr = data[0];
-    Tcl_Class clsPtr = data[1];
-    Tcl_Obj *const* objv = data[3];
-    int objc = PTR2INT(data[2]);
+    Tcl_Object *oPtr = (Tcl_Object *)data[0];
+    Tcl_Class clsPtr = (Tcl_Class)data[1];
+    Tcl_Obj *const *objv = (Tcl_Obj *const *)data[3];
+    size_t objc = PTR2INT(data[2]);
 
     ItclShowArgs(1, "CallPublicObjectCmd", objc, objv);
     result = Itcl_PublicObjectCmd(oPtr, interp, clsPtr, objc, objv);
@@ -2606,18 +2728,17 @@ CallPublicObjectCmd(
 
 int
 ItclObjectCmd(
-    ClientData clientData,
+    void *clientData,
     Tcl_Interp *interp,
     Tcl_Object oPtr,
     Tcl_Class clsPtr,
-    int objc,
+    size_t objc,
     Tcl_Obj *const *objv)
 {
     Tcl_Obj *methodNamePtr;
     Tcl_Obj **newObjv;
     Tcl_DString buffer;
     Tcl_Obj *myPtr;
-    ItclObjectInfo *infoPtr;
     ItclMemberFunc *imPtr;
     ItclClass *iclsPtr;
     Itcl_ListElem *elem;
@@ -2639,12 +2760,12 @@ ItclObjectCmd(
     myPtr = NULL;
     imPtr = (ItclMemberFunc *)clientData;
     iclsPtr = imPtr->iclsPtr;
-    infoPtr = imPtr->iclsPtr->infoPtr;
-    if ((oPtr == NULL) && (clsPtr == NULL)) {
-         isDirectCall = 1;
-    }
     if (oPtr == NULL) {
-	ClientData clientData;
+	ItclClass *icPtr = NULL;
+	ItclObject *ioPtr = NULL;
+
+	isDirectCall = (clsPtr == NULL);
+
 	if ((imPtr->flags & ITCL_COMMON)
 	        && (imPtr->codePtr != NULL)
 	        && !(imPtr->codePtr->flags & ITCL_BUILTIN)) {
@@ -2652,31 +2773,12 @@ ItclObjectCmd(
 	            objc, objv);
             return result;
 	}
-	oPtr = NULL;
-	clientData = Itcl_GetCallFrameClientData(interp);
-	if ((clientData == NULL) && (oPtr == NULL)) {
-	    if (((imPtr->codePtr != NULL)
-	            && (imPtr->codePtr->flags & ITCL_BUILTIN))) {
-	        result = Itcl_InvokeProcedureMethod(imPtr->tmPtr, interp,
-	                objc, objv);
-                return result;
-	    }
-	    if (infoPtr->currIoPtr != NULL) {
-	        /* if we want to call methods in the constructor for example
-	         * config* methods, clientData
-	         * is still NULL, but we can use infoPtr->currIoPtr
-	         * for getting the TclOO object ptr
-	         */
-	        oPtr = infoPtr->currIoPtr->oPtr;
-	    } else {
-	        Tcl_AppendResult(interp,
-	                "ItclObjectCmd cannot get context object (NULL)", NULL);
-	        return TCL_ERROR;
-	    }
+
+	if (TCL_OK == Itcl_GetContext(interp, &icPtr, &ioPtr)) {
+	    oPtr = ioPtr ? ioPtr->oPtr : icPtr->oPtr;
+	} else {
+	    Tcl_Panic("No Context");
 	}
-	if (oPtr == NULL) {
-            oPtr = Tcl_ObjectContextObject((Tcl_ObjectContext)clientData);
-        }
     }
     methodNamePtr = NULL;
     if (objv[0] != NULL) {
@@ -2708,8 +2810,21 @@ ItclObjectCmd(
 		}
                 elem = Itcl_NextListElem(elem);
 	    }
+	    if (!found) {
+		found = 1;
+		clsPtr = iclsPtr->clsPtr;
+	    }
         }
         Tcl_DStringFree(&buffer);
+    } else {
+	/* Can this happen? */
+	Tcl_Panic("objv[0] is NULL?!");
+	/* Panic above replaces obviously broken line below.  Creating
+	 * a string value from uninitialized memory cannot possibly be
+	 * a correct thing to do.
+
+        methodNamePtr = Tcl_NewStringObj(tail, -1);
+	 */
     }
     if (isDirectCall) {
 	if (!found) {
@@ -2717,7 +2832,6 @@ ItclObjectCmd(
 	        Tcl_DecrRefCount(methodNamePtr);
 	    }
             methodNamePtr = objv[0];
-            Tcl_IncrRefCount(methodNamePtr);
         }
     }
     callbackPtr = Itcl_GetCurrentCallbackPtr(interp);
@@ -2766,8 +2880,9 @@ ItclObjectCmd(
 	}
         incr = 1;
         newObjv = (Tcl_Obj **)ckalloc(sizeof(Tcl_Obj *)*(objc+incr));
-	myPtr = Tcl_NewStringObj("my", 2);
+        myPtr = Tcl_NewStringObj("my", 2);
         Tcl_IncrRefCount(myPtr);
+        Tcl_IncrRefCount(methodNamePtr);
         newObjv[0] = myPtr;
         newObjv[1] = methodNamePtr;
         memcpy(newObjv+incr+1, objv+1, (sizeof(Tcl_Obj*)*(objc-1)));
@@ -2778,7 +2893,7 @@ ItclObjectCmd(
     } else {
 	ItclShowArgs(1, "run CallPublicObjectCmd2", objc, objv);
 	Tcl_NRAddCallback(interp, CallPublicObjectCmd, oPtr, clsPtr,
-	        INT2PTR(objc), (ClientData)objv);
+		INT2PTR(objc), (void *)objv);
     }
 
     result = Itcl_NRRunCallbacks(interp, callbackPtr);
@@ -2790,46 +2905,6 @@ ItclObjectCmd(
         Tcl_DecrRefCount(myPtr);
     }
     return result;
-}
-
-/*
- * ------------------------------------------------------------------------
- *  ItclObjectUnknownCommand()
- *  syntax: is
- *  objv[0]    command name of myself (::itcl::methodset::objectUnknownCommand)
- *  objv[1]    object name for [self]
- *  objv[2]    object name as found on the stack
- *  objv[3]    method name
- * ------------------------------------------------------------------------
- */
-
-int
-ItclObjectUnknownCommand(
-    ClientData clientData,
-    Tcl_Interp *interp,
-    int objc,
-    Tcl_Obj *const *objv)
-{
-    Tcl_Object oPtr;
-    Tcl_Command cmd;
-    Tcl_CmdInfo cmdInfo;
-    ItclObject *ioPtr;
-    ItclObjectInfo *infoPtr;
-
-    ItclShowArgs(1, "ItclObjectUnknownCommand", objc, objv);
-    cmd = Tcl_GetCommandFromObj(interp, objv[1]);
-    if (Tcl_GetCommandInfoFromToken(cmd, &cmdInfo) != 1) {
-    }
-    oPtr = cmdInfo.objClientData;
-    infoPtr = (ItclObjectInfo *)Tcl_GetAssocData(interp,
-            ITCL_INTERP_DATA, NULL);
-    ioPtr = (ItclObject *)Tcl_ObjectGetMetadata(oPtr,
-            infoPtr->object_meta_type);
-    Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
-            "bad option \"", Tcl_GetString(objv[3]), "\": should be one of...",
-	    (char*)NULL);
-    ItclReportObjectUsage(interp, ioPtr, NULL, NULL);
-    return TCL_ERROR;
 }
 
 /*
@@ -2894,7 +2969,7 @@ GetClassFromClassName(
     Tcl_IncrRefCount(objPtr);
     hPtr = Tcl_FindHashEntry(&infoPtr->nameClasses, (char *)objPtr);
     if (hPtr != NULL) {
-        iclsPtr = Tcl_GetHashValue(hPtr);
+        iclsPtr = (ItclClass *)Tcl_GetHashValue(hPtr);
     } else {
         iclsPtr = NULL;
     }
@@ -2919,6 +2994,7 @@ ItclMapMethodNameProc(
     Tcl_Obj *className;
     Tcl_DString buffer;
     Tcl_HashEntry *hPtr;
+    Tcl_Namespace * myNsPtr;
     ItclObject *ioPtr;
     ItclClass *iclsPtr;
     ItclClass *iclsPtr2;
@@ -2958,6 +3034,19 @@ ItclMapMethodNameProc(
     }
     sp = Tcl_GetString(methodObj);
     Itcl_ParseNamespPath(sp, &buffer, &head, &tail);
+    if (head == NULL) {
+        /* itcl bug #3600923 call private method in class
+	 * without namespace
+	 */
+        myNsPtr = Tcl_GetCurrentNamespace(iclsPtr->interp);
+	hPtr = Tcl_FindHashEntry(&infoPtr->namespaceClasses, (char *) myNsPtr);
+	if (hPtr) {
+	    iclsPtr2 = (ItclClass *) Tcl_GetHashValue(hPtr);
+	    if (Itcl_IsMethodCallFrame(iclsPtr->interp) > 0) {
+		iclsPtr = iclsPtr2;
+	    }
+	}
+    }
     if (head != NULL) {
         className = NULL;
         methodName = Tcl_NewStringObj(tail, -1);
@@ -3001,13 +3090,13 @@ ItclMapMethodNameProc(
 	        ItclMemberFunc *imPtr2 = NULL;
                 Tcl_HashEntry *hPtr;
 	        Tcl_ObjectContext context;
-	        context = Itcl_GetCallFrameClientData(interp);
+	        context = (Tcl_ObjectContext)Itcl_GetCallFrameClientData(interp);
                 if (context != NULL) {
 	            hPtr = Tcl_FindHashEntry(
 		            &imPtr->iclsPtr->infoPtr->procMethods,
 	                    (char *)Tcl_ObjectContextMethod(context));
 	            if (hPtr != NULL) {
-	                imPtr2 = Tcl_GetHashValue(hPtr);
+	                imPtr2 = (ItclMemberFunc *)Tcl_GetHashValue(hPtr);
 	            }
 		    if ((imPtr->protection & ITCL_PRIVATE) &&
 		            (imPtr2 != NULL) &&
@@ -3020,11 +3109,36 @@ ItclMapMethodNameProc(
 		    }
                 }
 		/* END needed for test protect-2.5 */
-                Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
-                       "bad option \"", token, "\": should be one of...",
-                        (char*)NULL);
-	        ItclReportObjectUsage(interp, ioPtr, nsPtr, nsPtr);
-                return TCL_ERROR;
+                if (ioPtr == NULL) {
+                    /* itcl in fossil ticket: 2cd667f270b68ef66d668338e09d144e20405e23 */
+                    Tcl_HashEntry *hPtr;
+                    Tcl_Obj * objPtr;
+	            ItclMemberFunc *imPtr2 = NULL;
+                    ItclCmdLookup *clookupPtr;
+
+                    objPtr = Tcl_NewStringObj(token, -1);
+                    hPtr = Tcl_FindHashEntry(&iclsPtr->resolveCmds, (char *)objPtr);
+	            if (hPtr != NULL) {
+	                clookupPtr = (ItclCmdLookup *)Tcl_GetHashValue(hPtr);
+                        imPtr2 = clookupPtr->imPtr;
+                    }
+		    if ((imPtr->protection & ITCL_PRIVATE) &&
+		            (imPtr2 != NULL) &&
+		            (imPtr->iclsPtr->nsPtr == imPtr2->iclsPtr->nsPtr)) {
+                        Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
+		                "invalid command name \"",
+			        token,
+			        "\"", NULL);
+		        return TCL_ERROR;
+		    }
+                } else {
+                    Tcl_AppendResult(interp,
+                           "bad option \"", token, "\": should be one of...",
+                        NULL);
+	            ItclReportObjectUsage(interp, ioPtr, nsPtr, nsPtr);
+                    return TCL_ERROR;
+
+                }
             }
         }
     }
@@ -3045,8 +3159,8 @@ ExpandDelegateAs(
     Tcl_Obj *objPtr;
     const char **argv;
     const char *val;
-    int argc;
-    int j;
+    Tcl_Size argc;
+    Tcl_Size j;
 
 
     if (idmPtr->icPtr == NULL) {
@@ -3061,6 +3175,7 @@ ExpandDelegateAs(
             Tcl_ListObjAppendElement(interp, listPtr,
                     Tcl_NewStringObj(argv[j], -1));
         }
+	ckfree((char *)argv);
     } else {
 	if (idmPtr->usingPtr != NULL) {
 	    char *cp;
@@ -3095,7 +3210,8 @@ ExpandDelegateAs(
 			            Tcl_NewStringObj(cp, ep-cp-1));
 			}
                         objPtr = Tcl_NewStringObj(ITCL_VARIABLES_NAMESPACE, -1);
-                        Tcl_AppendToObj(objPtr, iclsPtr->nsPtr->fullName, -1);
+			Tcl_AppendToObj(objPtr, (Tcl_GetObjectNamespace(
+				iclsPtr->oPtr))->fullName, -1);
                         Tcl_AppendToObj(objPtr, "::", -1);
                         Tcl_AppendToObj(objPtr,
 			        Tcl_GetString(componentNamePtr), -1);
@@ -3194,8 +3310,8 @@ ExpandDelegateAs(
 			    }
 		            break;
 		        } else {
-			    /* fall through */
 			}
+		    /* FALLTHRU */
 		    default:
 		      {
 			char buf[2];
@@ -3237,6 +3353,9 @@ ExpandDelegateAs(
 		        ep++;
 		    }
 		}
+	    }
+	    if (hadDoublePercent) {
+		    /* FIXME need code here */
 	    }
 	    if (cp != ep) {
 		if (*ep == '\0') {
@@ -3289,6 +3408,9 @@ DelegateFunction(
         return result;
     }
     val = Tcl_GetString(listPtr);
+    if (val == NULL) {
+        /* FIXME need code here */
+    }
     if (componentValuePtr != NULL) {
         mPtr = Itcl_NewForwardClassMethod(interp, iclsPtr->clsPtr, 1,
                 idmPtr->namePtr, listPtr);
@@ -3314,7 +3436,7 @@ DelegateFunction(
 
 int
 DelegatedOptionsInstall(
-    Tcl_Interp *interp,
+    TCL_UNUSED(Tcl_Interp *),
     ItclClass *iclsPtr)
 {
     Tcl_HashEntry *hPtr2;
@@ -3343,7 +3465,7 @@ DelegatedOptionsInstall(
 	    if (hPtr2 == NULL) {
 		ioptPtr = NULL;
 	    } else {
-	        ioptPtr = Tcl_GetHashValue(hPtr2);
+	        ioptPtr = (ItclOption *)Tcl_GetHashValue(hPtr2);
 	        ioptPtr->idoPtr = idoPtr;
 	    }
 	    idoPtr->ioptPtr = ioptPtr;
@@ -3373,7 +3495,7 @@ GetConstructorVar(
     ItclVariable *ivPtr;
     const char *val;
 
-    hPtr = Tcl_FindHashEntry(&iclsPtr->resolveVars, (char *)varName);
+    hPtr = ItclResolveVarEntry(iclsPtr, (char *)varName);
     if (hPtr == NULL) {
 	/* no such variable */
         return NULL;
@@ -3389,7 +3511,8 @@ GetConstructorVar(
     if (ivPtr->flags & ITCL_COMMON) {
         /* look for a common variable */
         objPtr = Tcl_NewStringObj(ITCL_VARIABLES_NAMESPACE, -1);
-        Tcl_AppendToObj(objPtr, iclsPtr->nsPtr->fullName, -1);
+        Tcl_AppendToObj(objPtr, (Tcl_GetObjectNamespace(
+		iclsPtr->oPtr))->fullName, -1);
         Tcl_AppendToObj(objPtr, "::", -1);
         Tcl_AppendToObj(objPtr, varName, -1);
         val = Tcl_GetVar2(interp, Tcl_GetString(objPtr), NULL, 0);
@@ -3452,7 +3575,9 @@ DelegationInstall(
 	    ivPtr = idmPtr->icPtr->ivPtr;
             if (ivPtr->flags & ITCL_COMMON) {
 	        objPtr = Tcl_NewStringObj(ITCL_VARIABLES_NAMESPACE, -1);
-	        Tcl_AppendToObj(objPtr, ivPtr->iclsPtr->nsPtr->fullName, -1);
+
+	        Tcl_AppendToObj(objPtr, (Tcl_GetObjectNamespace(
+			ivPtr->iclsPtr->oPtr))->fullName, -1);
 	        Tcl_AppendToObj(objPtr, "::", -1);
 	        Tcl_AppendToObj(objPtr,
 		        Tcl_GetString(idmPtr->icPtr->namePtr), -1);
@@ -3498,6 +3623,12 @@ DelegationInstall(
 	            continue;
 	        }
                 if (strcmp(methodName, "keepcomponentoption") == 0) {
+	            continue;
+	        }
+                if (strcmp(methodName, "ignorecomponentoption") == 0) {
+	            continue;
+	        }
+                if (strcmp(methodName, "renamecomponentoption") == 0) {
 	            continue;
 	        }
                 if (strcmp(methodName, "setupcomponent") == 0) {
@@ -3576,14 +3707,24 @@ ItclInitExtendedClassOptions(
 		if (ItclGetInstanceVar(interp, "itcl_options",
 		        Tcl_GetString(ioptPtr->namePtr), ioPtr, iclsPtr)
 			== NULL) {
-                    ItclSetInstanceVar(interp, "itcl_options",
-                            Tcl_GetString(ioptPtr->namePtr),
-                            Tcl_GetString(ioptPtr->defaultValuePtr),
-			    ioPtr, iclsPtr);
 	        }
             }
 	}
     }
     Itcl_DeleteHierIter(&hier);
     return TCL_OK;
+}
+
+ItclClass *
+ItclNamespace2Class(Tcl_Namespace *nsPtr)
+{
+    ItclObjectInfo * infoPtr;
+    Tcl_HashEntry *hPtr;
+    infoPtr = (ItclObjectInfo *)Tcl_GetAssocData(((Namespace *)nsPtr)->interp,
+	ITCL_INTERP_DATA, NULL);
+    hPtr = Tcl_FindHashEntry(&(infoPtr->namespaceClasses), nsPtr);
+    if (hPtr == NULL) {
+	return NULL;
+    }
+    return (ItclClass *)Tcl_GetHashValue(hPtr);
 }

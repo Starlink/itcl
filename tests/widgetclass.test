@@ -26,10 +26,10 @@ proc testsNeedTcl {version} {
     # testsuite calling the command. The command has to be called
     # immediately after loading the utilities.
 
-    if {[package vsatisfies [package provide Tcl] $version]} return
+    if {[package vsatisfies [package provide Tcl] ${version}-]} return
 
     puts "    Aborting the tests found in \"[file tail [info script]]\""
-    puts "    Requiring at least Tcl $version, have [package present Tcl]."
+    puts "    Requiring at least Tcl $version, have [package provide Tcl]."
 
     # This causes a 'return' in the calling scope.
     return -code return
@@ -58,6 +58,7 @@ proc testsNeedTcltest {version} {
 	    return
 	}
     } elseif {[package vcompare [package present tcltest] $version] >= 0} {
+	namespace import -force ::tcltest::*
 	return
     }
 
@@ -94,9 +95,10 @@ interp alias {} type {} ::itcl::type
 interp alias {} widget {} ::itcl::widget
 
 # Marks tests which are only for Tk.
-tcltest::testConstraint tk [info exists tk_version]
+tcltest::testConstraint tk [expr {![catch {package require Tk}]}]
 
 ::tcltest::loadTestedCommands
+package require itcl
 
 #-----------------------------------------------------------------------
 # Widgets
@@ -219,7 +221,7 @@ test install-1.4 {install queries option database
         }
 
         constructor {args} {
-            installcomponent text using text $win.text 
+            installcomponent text using text $win.text
         }
     }
 
@@ -815,12 +817,6 @@ test winfo-10.3 {widget info widgetclasses
 
 #---------------------------------------------------------------------
 # Clean up
-
-if {[llength [::info command ::itcl::dumppreserveinfo]] > 0} {
-    ::itcl::finish
-    ::itcl::dumppreserveinfo  checkmemoryleaks
-    ::itcl::dumprefcountinfo -nodeleted
-}
 
 ::tcltest::cleanupTests
 return

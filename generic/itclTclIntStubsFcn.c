@@ -32,20 +32,22 @@ _Tcl_CreateProc(
     Tcl_Obj *bodyPtr,           /* Command body. */
     Tcl_Proc *procPtrPtr)       /* Returns: pointer to proc data. */
 {
-    return TclCreateProc(interp, (Namespace *)nsPtr, procName, argsPtr,
+    int code = TclCreateProc(interp, (Namespace *)nsPtr, procName, argsPtr,
             bodyPtr, (Proc **)procPtrPtr);
+    (*(Proc **)procPtrPtr)->cmdPtr = NULL;
+    return code;
 }
 
-void *
+Tcl_ObjCmdProc *
 _Tcl_GetObjInterpProc(
     void)
 {
-    return (void *)TclGetObjInterpProc();
+    return TclGetObjInterpProc();
 }
 
 void
 _Tcl_ProcDeleteProc(
-    ClientData clientData)
+    void *clientData)
 {
     TclProcDeleteProc(clientData);
 }
@@ -122,9 +124,9 @@ Itcl_GetNamespaceChildTable(
 int
 Itcl_InitRewriteEnsemble(
     Tcl_Interp *interp,
-    int numRemoved,
-    int numInserted,
-    int objc,
+    size_t numRemoved,
+    size_t numInserted,
+    TCL_UNUSED(size_t) /* objc */,
     Tcl_Obj *const *objv)
 {
     return TclInitRewriteEnsemble(interp, numRemoved, numInserted, objv);

@@ -19,14 +19,14 @@ namespace eval ::itcl {
 
 proc widget {name args} {
     set result [uplevel 1 ::itcl::internal::commands::genericclass widget $name $args]
-    # we handle create by owerselfs !! allow classunknown to handle that 
+    # we handle create by owerselfs !! allow classunknown to handle that
     oo::objdefine $result unexport create
     return $result
 }
 
 proc widgetadaptor {name args} {
     set result [uplevel 1 ::itcl::internal::commands::genericclass widgetadaptor $name $args]
-    # we handle create by owerselfs !! allow classunknown to handle that 
+    # we handle create by owerselfs !! allow classunknown to handle that
     oo::objdefine $result unexport create
     return $result
 }
@@ -158,47 +158,38 @@ proc hullandoptionsinstall {objectName className widgetClass hulltype args} {
 namespace eval ::itcl::builtin {
 
 proc installhull {args} {
-    upvar win win
-
     set cmdPath ::itcl::internal::commands
     set className [uplevel 1 info class]
-    set numArgs [llength $args]
-    if {$numArgs < 2} {
-        if {$numArgs != 1} {
-	    error "wrong # args: should be \"installhull name|using <widgetType> ?arg ...?\""
+
+    set replace 0
+    switch -- [llength $args] {
+	0	{
+		return -code error\
+		"wrong # args: should be \"[lindex [info level 0] 0]\
+		name|using <widgetType> ?arg ...?\""
+	}
+	1	{
+		set widgetName [lindex $args 0]
+		set varNsName $::itcl::internal::varNsName($widgetName)
+	}
+	default	{
+		upvar win win
+		set widgetName $win
+
+		set varNsName $::itcl::internal::varNsName($widgetName)
+	        set widgetType [lindex $args 1]
+		incr replace
+		if {[llength $args] > 3 && [lindex $args 2] eq "-class"} {
+		    set classNam [lindex $args 3]
+		    incr replace 2
+		} else {
+		    set classNam [string totitle $widgetType]
+		}
+		uplevel 1 [lreplace $args 0 $replace $widgetType $widgetName -class $classNam]
+		uplevel 1 [list ${cmdPath}::initWidgetOptions $varNsName $widgetName $className]
 	}
     }
-    set shortForm 0
-    set widgetName $win
-    set origWidgetName $widgetName
-    if {$numArgs == 1} {
-        set shortForm 1
-	set widgetName [lindex $args 0]
-    }
-    set varNsName ::itcl::internal::variables::$widgetName
-    set myCmd [uplevel 1 ::info command $widgetName]
-    set haveObject 1
-    if {$myCmd eq ""} {
-        set haveObject 0
-    }
-    set args [lrange $args 1 end]
-    if {!$shortForm} {
-        set widgetType [lindex $args 0]
-        set args [lrange $args 1 end]
-	set classNam ""
-        if {$numArgs > 2} {
-	    set classOpt [lindex $args 0]
-	    if {$classOpt eq "-class"} {
-	        set classNam [lindex $args 1]
-                set args [lrange $args 2 end]
-	    }
-	}
-	if {$classNam eq ""} {
-	    set classNam [string totitle $widgetType]
-	}
-        uplevel 1 $widgetType $widgetName -class $classNam $args
-        uplevel 1 ${cmdPath}::initWidgetOptions $varNsName $widgetName $className
-    }
+
     # initialize the itcl_hull variable
     set i 0
     set nam ::itcl::internal::widgets::hull
@@ -209,26 +200,20 @@ proc installhull {args} {
 	     break
 	}
     }
-    uplevel 1 ${cmdPath}::sethullwindowname $widgetName
-    uplevel 1 rename $widgetName $hullNam
-    uplevel 1 trace add command $hullNam \[list delete rename\] ::itcl::internal::commands::deletehull
-    set objectName [namespace tail $win]
+    uplevel 1 [list ${cmdPath}::sethullwindowname $widgetName]
+    uplevel 1 [list ::rename $widgetName $hullNam]
+    uplevel 1 [list ::trace add command $hullNam {delete rename} ::itcl::internal::commands::deletehull]
     catch {${cmdPath}::checksetitclhull [list] 0}
     namespace eval ${varNsName}${className} "set itcl_hull $hullNam"
     catch {${cmdPath}::checksetitclhull [list] 2}
-    set cmd "${cmdPath}::initWidgetDelegatedOptions $varNsName $widgetName $className"
-    if {$args ne ""} {
-        append cmd " $args"
-    }
-    uplevel 1 $cmd
-
+    uplevel 1 [lreplace $args 0 $replace ${cmdPath}::initWidgetDelegatedOptions $varNsName $widgetName $className]
 }
 
 proc installcomponent {args} {
     upvar win win
 
     set className [uplevel 1 info class]
-    set myType [info types [namespace tail $className]]
+    set myType [${className}::info types [namespace tail $className]]
     set isType 0
     if {$myType ne ""} {
         set isType 1
@@ -349,7 +334,7 @@ proc hulltypes {args} {
     namespace upvar ::itcl::internal::dicts hullTypes hullTypes
 
     set numArgs [llength $args]
-    if {$numArgs > 1} { 
+    if {$numArgs > 1} {
         error "wrong # args should be: info hulltypes ?<pattern>?"
     }
     set pattern ""
@@ -365,7 +350,7 @@ proc hulltypes {args} {
 
 proc widgetclasses {args} {
     set numArgs [llength $args]
-    if {$numArgs > 1} { 
+    if {$numArgs > 1} {
         error "wrong # args should be: info widgetclasses ?<pattern>?"
     }
     set pattern ""
@@ -397,7 +382,7 @@ proc widgetclasses {args} {
 
 proc widgets {args} {
     set numArgs [llength $args]
-    if {$numArgs > 1} { 
+    if {$numArgs > 1} {
         error "wrong # args should be: info widgets ?<pattern>?"
     }
     set pattern ""
@@ -429,7 +414,7 @@ proc widgets {args} {
 
 proc widgetadaptors {args} {
     set numArgs [llength $args]
-    if {$numArgs > 1} { 
+    if {$numArgs > 1} {
         error "wrong # args should be: info widgetadaptors ?<pattern>?"
     }
     set pattern ""

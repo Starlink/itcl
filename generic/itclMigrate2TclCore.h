@@ -3,19 +3,18 @@
  * infoPtr->useOldResolvers == 0 which is not the default
  */
 #define FRAME_HAS_RESOLVER 0x100
-struct Tcl_Var;
 typedef Tcl_Command (Tcl_CmdAliasProc)(Tcl_Interp *interp,
-        Tcl_Namespace *nsPtr, CONST char *cmdName,
-        ClientData clientData);
+        Tcl_Namespace *nsPtr, const char *cmdName,
+        void *clientData);
 typedef Tcl_Var (Tcl_VarAliasProc)(Tcl_Interp *interp,
-        Tcl_Namespace *nsPtr, CONST char *varName,
-        ClientData clientData);
+        Tcl_Namespace *nsPtr, const char *varName,
+        void *clientData);
 
 #ifndef _TCL_RESOLVE_DEFINED
 typedef struct Tcl_Resolve {
     Tcl_VarAliasProc *varProcPtr;
     Tcl_CmdAliasProc *cmdProcPtr;
-    ClientData clientData;
+    void *clientData;
 } Tcl_Resolve;
 #define _TCL_RESOLVE_DEFINED 1
 #endif
@@ -41,7 +40,7 @@ typedef struct Tcl_ResolvedVarInfo {
 } Tcl_ResolvedVarInfo;
 
 typedef int (Tcl_ResolveCompiledVarProc) (Tcl_Interp *interp,
-	const char *name, int length, Tcl_Namespace *context,
+	const char *name, Tcl_Size length, Tcl_Namespace *context,
 	Tcl_ResolvedVarInfo **rPtr);
 
 typedef int (Tcl_ResolveVarProc) (Tcl_Interp *interp, const char *name,
@@ -72,11 +71,13 @@ typedef struct Tcl_Proc_ *Tcl_Proc;
 #define _TCL_PROC_DEFINED 1
 #endif
 
-#define Tcl_SetProcCmd _Tcl_SetProcCmd
-
 MODULE_SCOPE Tcl_Var Tcl_NewNamespaceVar(Tcl_Interp *interp, Tcl_Namespace *nsPtr,
 	const char *varName);
+MODULE_SCOPE void Itcl_PreserveVar(Tcl_Var var);
+MODULE_SCOPE void Itcl_ReleaseVar(Tcl_Var var);
 MODULE_SCOPE int Itcl_IsCallFrameArgument(Tcl_Interp *interp, const char *name);
+MODULE_SCOPE size_t Itcl_GetCallVarFrameObjc(Tcl_Interp *interp);
+MODULE_SCOPE Tcl_Obj *const * Itcl_GetCallVarFrameObjv(Tcl_Interp *interp);
 #define Tcl_SetNamespaceResolver _Tcl_SetNamespaceResolver
 MODULE_SCOPE int _Tcl_SetNamespaceResolver(Tcl_Namespace *nsPtr,
         struct Tcl_Resolve *resolvePtr);

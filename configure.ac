@@ -1,16 +1,25 @@
 #!/bin/bash -norc
-#--------------------------------------------------------------------
-# Sample configure.in for Tcl Extensions.  The only places you should
-# need to modify this file are marked by the string __CHANGE__
-#--------------------------------------------------------------------
+dnl	This file is an input file used by the GNU "autoconf" program to
+dnl	generate the file "configure", which is run during Tcl installation
+dnl	to configure the system for the local environment.
 
 #-----------------------------------------------------------------------
+# Sample configure.ac for Tcl Extensions.  The only places you should
+# need to modify this file are marked by the string __CHANGE__
+#-----------------------------------------------------------------------
+
+#-----------------------------------------------------------------------
+# __CHANGE__
+# Set your package name and version numbers here.
+#
 # This initializes the environment with PACKAGE_NAME and PACKAGE_VERSION
 # set as provided.  These will also be added as -D defs in your Makefile
 # so you can encode the package version directly into the source files.
+# This will also define a special symbol for Windows (BUILD_<PACKAGE_NAME>
+# so that we create the export library with the dll.
 #-----------------------------------------------------------------------
 
-AC_INIT([itcl], [4.0.0])
+AC_INIT([itcl],[4.2.3])
 
 #--------------------------------------------------------------------
 # Call TEA_INIT as the first TEA_ macro to set up initial vars.
@@ -18,17 +27,28 @@ AC_INIT([itcl], [4.0.0])
 # as well as PKG_LIB_FILE and PKG_STUB_LIB_FILE.
 #--------------------------------------------------------------------
 
-TEA_INIT([3.9])
+TEA_INIT()
+
+#--------------------------------------------------------------------
+# Try to ensure the existence of a tclconfig directory in either
+# $srcdir or the current dir, if one can't be found in $srcdir.
+# If this package is being built as part of a bundle then a tclconfig
+# directory might exist in $srcdir's parent directory.
+#--------------------------------------------------------------------
 
 AC_PROG_LN_S
 CONFIG_CLEAN_FILES=
 if test ! -d $srcdir/tclconfig ; then
     if test -d $srcdir/../tclconfig ; then
-        $LN_S $srcdir/../tclconfig tclconfig
-        CONFIG_CLEAN_FILES=tclconfig
+	$LN_S $srcdir/../tclconfig tclconfig
+	CONFIG_CLEAN_FILES=tclconfig
     fi
 fi
 AC_SUBST(CONFIG_CLEAN_FILES)
+
+#--------------------------------------------------------------------
+# Tell autoconf where to find tcl.m4 and install.sh.
+#--------------------------------------------------------------------
 
 AC_CONFIG_AUX_DIR(tclconfig)
 
@@ -39,11 +59,27 @@ AC_CONFIG_AUX_DIR(tclconfig)
 TEA_PATH_TCLCONFIG
 TEA_LOAD_TCLCONFIG
 
-if test "${TCL_VERSION}" != "8.6"; then
+#--------------------------------------------------------------------
+# Tcl 8.6+ required.
+#--------------------------------------------------------------------
+
+if test "${TCL_MAJOR_VERSION}" -lt 8; then
     AC_MSG_ERROR([${TCL_BIN_DIR}/tclConfig.sh is for Tcl ${TCL_VERSION}.
-Itcl ${PACKAGE_VERSION} needs Tcl 8.6.
-Use --with-tcl= option to indicate location of tclConfig.sh file for Tcl 8.6.])
+Itcl ${PACKAGE_VERSION} needs Tcl 8.6 or higher.
+Use --with-tcl= option to indicate location of tclConfig.sh file for Tcl 8.6+.])
 fi
+if test "${TCL_MINOR_VERSION}" -lt 6 -a "${TCL_MAJOR_VERSION}" -eq 8; then
+    AC_MSG_ERROR([${TCL_BIN_DIR}/tclConfig.sh is for Tcl ${TCL_VERSION}.
+Itcl ${PACKAGE_VERSION} needs Tcl 8.6 or higher.
+Use --with-tcl= option to indicate location of tclConfig.sh file for Tcl 8.6+.])
+fi
+
+#--------------------------------------------------------------------
+# Load the tkConfig.sh file if necessary (Tk extension)
+#--------------------------------------------------------------------
+
+#TEA_PATH_TKCONFIG
+#TEA_LOAD_TKCONFIG
 
 #-----------------------------------------------------------------------
 # Handle the --prefix=... option by defaulting to what Tcl gave.
@@ -55,8 +91,8 @@ TEA_PREFIX
 #-----------------------------------------------------------------------
 # Standard compiler checks.
 # This sets up CC by using the CC env var, or looks for gcc otherwise.
-# This also calls AC_PROG_CC and a few others to create
-# the basic setup necessary to compile executables.
+# This also calls AC_PROG_CC and a few others to create the basic setup
+# necessary to compile executables.
 #-----------------------------------------------------------------------
 
 TEA_SETUP_COMPILER
@@ -91,6 +127,7 @@ TEA_ADD_SOURCES([
 	        itclTclIntStubsFcn.c
 	        itclUtil.c
                 itclMigrate2TclCore.c
+		itclTestRegisterC.c
                 ])
 TEA_ADD_HEADERS([generic/itcl.h
                 generic/itclDecls.h
@@ -102,29 +139,34 @@ TEA_ADD_HEADERS([generic/itcl.h
 		])
 TEA_ADD_INCLUDES([-I. -I\"`${CYGPATH} ${srcdir}/generic`\"])
 TEA_ADD_LIBS([])
-TEA_ADD_CFLAGS([-DUSE_TCLOO_STUBS])
+TEA_ADD_CFLAGS([])
 TEA_ADD_STUB_SOURCES(itclStubLib.c)
 TEA_ADD_TCL_SOURCES([library/itcl.tcl library/itclWidget.tcl library/itclHullCmds.tcl])
 
 #--------------------------------------------------------------------
 # __CHANGE__
-# A few miscellaneous platform-specific items:
 #
-# Define a special symbol for Windows (BUILD_itcl in this case) so
-# that we create the export library with the dll.  See sha1.h on how
-# to use this.
-#
-# Windows creates a few extra files that need to be cleaned up.
 # You can add more files to clean if your extension creates any extra
-# files.
+# files by extending CLEANFILES.
+# Add pkgIndex.tcl if it is generated in the Makefile instead of ./configure
+# and change Makefile.in to move it from CONFIG_CLEAN_FILES to BINARIES var.
 #
-# Define any extra compiler flags in the PACKAGE_CFLAGS variable.
-# These will be appended to the current set of compiler flags for
-# your system.
+# A few miscellaneous platform-specific items:
+# TEA_ADD_* any platform specific compiler/build info here.
 #--------------------------------------------------------------------
 
+#CLEANFILES="$CLEANFILES pkgIndex.tcl"
 if test "${TEA_PLATFORM}" = "windows" ; then
+    # Ensure no empty if clauses
+    :
+    #TEA_ADD_SOURCES([win/winFile.c])
+    #TEA_ADD_INCLUDES([-I\"$(${CYGPATH} ${srcdir}/win)\"])
     TEA_ADD_SOURCES([dllEntryPoint.c])
+else
+    # Ensure no empty else clauses
+    :
+    #TEA_ADD_SOURCES([unix/unixFile.c])
+    #TEA_ADD_LIBS([-lsuperfly])
 fi
 
 #--------------------------------------------------------------------
@@ -133,29 +175,22 @@ fi
 # hard to only rely on the Tcl public header files.  Internal headers
 # contain private data structures and are subject to change without
 # notice.
-# This must be done AFTER calling TEA_PATH_TCLCONFIG/TEA_LOAD_TCLCONFIG
-# so that we can extract TCL_SRC_DIR from the config file (in the case
-# of private headers
+# This MUST be called after TEA_LOAD_TCLCONFIG / TEA_LOAD_TKCONFIG
 #--------------------------------------------------------------------
 
 TEA_PUBLIC_TCL_HEADERS
 #TEA_PRIVATE_TCL_HEADERS
 
-#--------------------------------------------------------------------
-# We need to enable the threading macros found in tcl.h and tclInt.h.
-# The use of the threading features is determined by the core the
-# extension is loaded into, but we need to compile with these macros
-# turned on.
-#--------------------------------------------------------------------
-
-AC_DEFINE(TCL_THREADS)
+#TEA_PUBLIC_TK_HEADERS
+#TEA_PRIVATE_TK_HEADERS
+#TEA_PATH_X
 
 #--------------------------------------------------------------------
 # Check whether --enable-threads or --disable-threads was given.
 # This auto-enables if Tcl was compiled threaded.
 #--------------------------------------------------------------------
 
-#TEA_ENABLE_THREADS
+TEA_ENABLE_THREADS
 
 #--------------------------------------------------------------------
 # The statement below defines a collection of symbols related to
@@ -173,8 +208,7 @@ TEA_ENABLE_SHARED
 TEA_CONFIG_CFLAGS
 
 #--------------------------------------------------------------------
-# Set the default compiler switches based on the --enable-symbols
-# option.
+# Set the default compiler switches based on the --enable-symbols option.
 #--------------------------------------------------------------------
 
 TEA_ENABLE_SYMBOLS
@@ -189,7 +223,7 @@ AC_CHECK_TYPE([intptr_t], [
     for tcl_cv_intptr_t in "int" "long" "long long" none; do
 	if test "$tcl_cv_intptr_t" != none; then
 	    AC_COMPILE_IFELSE([AC_LANG_BOOL_COMPILE_TRY([AC_INCLUDES_DEFAULT],
-		    [[sizeof (void *) <= sizeof ($tcl_cv_intptr_t)]])], 
+		    [[sizeof (void *) <= sizeof ($tcl_cv_intptr_t)]])],
 		[tcl_ok=yes], [tcl_ok=no])
 	    test "$tcl_ok" = yes && break; fi
     done])
@@ -200,17 +234,6 @@ AC_CHECK_TYPE([intptr_t], [
 ])
 
 #--------------------------------------------------------------------
-# Everyone should be linking against the Tcl stub library.  If you
-# can't for some reason, remove this definition.  If you aren't using
-# stubs, you also need to modify the SHLIB_LD_LIBS setting below to
-# link against the non-stubbed Tcl library.
-#--------------------------------------------------------------------
-
-if test "${SHARED_BUILD}" = "1" ; then
-    AC_DEFINE(USE_TCL_STUBS)
-fi
-
-#--------------------------------------------------------------------
 # This macro generates a line to use when building a library.  It
 # depends on values set by the TEA_ENABLE_SHARED, TEA_ENABLE_SYMBOLS,
 # and TEA_LOAD_TCLCONFIG macros above.
@@ -219,26 +242,15 @@ fi
 TEA_MAKE_LIB
 
 #--------------------------------------------------------------------
-# __CHANGE__
-# Change the name from exampeA_LIB_FILE to match your package name.
-# Use the stub_LIB_FILE substitution if your package creates a stub
-# library.
-#--------------------------------------------------------------------
-
-itcl_STUB_LIB_FILE=${PKG_STUB_LIB_FILE}
-itcl_LIB_FILE=${PKG_LIB_FILE}
-AC_SUBST(itcl_STUB_LIB_FILE)
-AC_SUBST(itcl_LIB_FILE)
-
-#--------------------------------------------------------------------
-# Find tclsh so that we can run pkg_mkIndex to generate the pkgIndex.tcl
-# file during the install process.  Don't run the TCLSH_PROG through
-# ${CYGPATH} because it's being used directly by make.
-# Require that we use a tclsh shell version 8.2 or later since earlier
-# versions have bugs in the pkg_mkIndex routine.
+# Determine the name of the tclsh and/or wish executables in the
+# Tcl and Tk build directories or the location they were installed
+# into. These paths are used to support running test cases only,
+# the Makefile should not be making use of these paths to generate
+# a pkgIndex.tcl file or anything else at extension build time.
 #--------------------------------------------------------------------
 
 TEA_PROG_TCLSH
+#TEA_PROG_WISH
 
 #--------------------------------------------------------------------
 # These are for itclConfig.sh
@@ -251,11 +263,14 @@ eval itcl_SRC_DIR="$srcdir"
 itcl_SRC_DIR=`cd "${itcl_SRC_DIR}"; pwd`
 AC_SUBST(itcl_SRC_DIR)
 
-eval itcl_INCLUDE_SPEC="${itcl_SRC_DIR}/generic"
+eval itcl_INCLUDE_SPEC="-I${itcl_SRC_DIR}/generic"
 AC_SUBST(itcl_INCLUDE_SPEC)
 
 #--------------------------------------------------------------------
 # Finally, substitute all of the various values into the Makefile.
+# You may alternatively have a special pkgIndex.tcl.in or other files
+# which require substituting the AC variables in. Include these here.
 #--------------------------------------------------------------------
 
-AC_OUTPUT([Makefile pkgIndex.tcl itclConfig.sh])
+AC_CONFIG_FILES([Makefile pkgIndex.tcl itclConfig.sh])
+AC_OUTPUT
