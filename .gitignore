@@ -6,8 +6,10 @@ config.status
 configure.lineno
 itclConfig.sh
 *.o
-itclsh3.4
-libitcl3.4.*
-libitclstub3.4.*
+itclsh4.*
+libitcl4.*
+libitclstub4.*
 pkgIndex.tcl
 *~
+.*.swp
+/itclUuid.h
