@@ -258,6 +258,9 @@ TEA_PROG_TCLSH
 
 TEA_EXPORT_CONFIG([itcl])
 
+AC_SUBST(LD_SEARCH_FLAGS)
+AC_SUBST(MATH_LIBS)
+
 # itcl_SRC_DIR must be a fully qualified path
 eval itcl_SRC_DIR="$srcdir"
 itcl_SRC_DIR=`cd "${itcl_SRC_DIR}"; pwd`

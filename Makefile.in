@@ -131,7 +131,7 @@ TCL_SRC_DIR	= @TCL_SRC_DIR@
 
 LD_SEARCH_FLAGS = @LD_SEARCH_FLAGS@
 EXEEXT          = @EXEEXT@
-ITCLSH_LIBS     = @TCL_LIB_SPEC@ @LIBS@ @DL_LIBS@ @MATH_LIBS@
+ITCLSH_LIBS     = @TCL_LIB_SPEC@ @TCL_STUB_LIB_SPEC@ @LIBS@ @MATH_LIBS@
 
 #========================================================================
 # TCLLIBPATH seeds the auto_path in Tcl's init.tcl so we can test our

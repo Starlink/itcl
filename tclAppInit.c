@@ -92,6 +92,8 @@ int
 Tcl_AppInit(interp)
     Tcl_Interp *interp;		/* Interpreter for application. */
 {
+    Tcl_InitStubs(interp, "8.6.13", 0);
+
     if (Tcl_Init(interp) == TCL_ERROR) {
 	return TCL_ERROR;
     }
