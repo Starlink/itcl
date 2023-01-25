@@ -714,7 +714,7 @@ Itcl_ScopeCmd(
      *  below.
      */
     for (p=token; *p != '\0'; p++) {
-        if (*p == '(') {
+        if (*p == '(' && ! openParen) {
             openParen = p;
         }
         else if (*p == ')' && openParen) {
